@@ -441,7 +441,7 @@ DATASET_INFO = {
 
 
 def plot_combined_tree_diagram():
-    # Extract data from the combined structure
+    # Extract data from the updated structure
     datasets = list(DATASET_INFO.keys())
     papers = np.array([DATASET_INFO[dataset]["Papers"] for dataset in datasets])
     female = np.array([0 if DATASET_INFO[dataset]["Female"] == "N/A" else DATASET_INFO[dataset]["Female"] for dataset in datasets])
@@ -461,7 +461,7 @@ def plot_combined_tree_diagram():
     multi_ethnicity_colors = ["#44AA99" if is_multi else "#CC6677" for is_multi in multi_ethnicity]
 
     # Plotting
-    fig, ax = plt.subplots(figsize=(20, 12))  # Increase width for clarity
+    fig, ax = plt.subplots(figsize=(20, 12))
 
     # Left bar for papers (negative values for left side)
     ax.barh(datasets, -papers_pct, color=multi_ethnicity_colors, label="Dataset Usage (Papers)")
@@ -480,22 +480,22 @@ def plot_combined_tree_diagram():
     for i, total_val in enumerate(total):
         if female[i] + male[i] > 0:
             # Percentages in the middle of each bar
-            ax.text(female[i] / 2, i, f"{female_pct[i]}%", va='center', ha='center', fontsize=9, color="white")
-            ax.text(female[i] + male[i] / 2, i, f"{male_pct[i]}%", va='center', ha='center', fontsize=9, color="white")
+            ax.text(female_pct[i] / 2, i, f"{female_pct[i]}%", va='center', ha='center', fontsize=9, color="white")
+            ax.text(female_pct[i] + male_pct[i] / 2, i, f"{male_pct[i]}%", va='center', ha='center', fontsize=9, color="white")
             # Total participants at the end of the bar
             ax.text(105, i, f"{total_val}", va='center', ha='left', fontsize=10, color="black")
         else:
-            ax.text(50, i, "N/A", va='center', ha='center', fontsize=10, color="black")
+            ax.text(105, i, f"{total_val}", va='center', ha='left', fontsize=10, color="black")
 
     # Adding labels for number of papers (left bars)
     for i, val in enumerate(papers):
-        ax.text(-papers_pct[i] - 5, i, f"{val}", va='center', ha='right', fontsize=10, color="black")
+        ax.text(-papers_pct[i] - 5, i, f"{val} papers", va='center', ha='right', fontsize=10, color="black")
 
     # Customize
     ax.set_yticks(range(len(datasets)))
     ax.set_yticklabels(datasets, fontsize=12)
     ax.set_title("Tree-like Diagram: Article Usage, Ethnicity and Gender Distribution", fontsize=18, weight="bold")
-    ax.set_xlabel("Percentage Scale (left side: datasets usage in articles; right side: gender distribution in datasets)", fontsize=14)
+    ax.set_xlabel("Percentage Scale (left side: dataset usage in articles; right side: gender distribution in datasets)", fontsize=14)
     ax.axvline(0, color='black', linewidth=3)  # Central divider with larger width
 
     # X-axis percentages
