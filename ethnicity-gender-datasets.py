@@ -47,12 +47,22 @@ DATA_ETHNICITY_MAPPING = {
 
 # Define patterns for each ethnicity
 ETHNICITY_PATTERNS = {
-    "Asian": "//",  # Diagonal stripes
     "White": "--",  # Horizontal lines
+    "Asian": "//",  # Diagonal stripes
     "Black": "\\\\",  # Backward diagonal stripes
-    "Multi-Ethnicity": "xx",  # Crossed lines
-    "Other": "||",  # Vertical stripes
+    "Caucasian": "||",  # Vertical stripes
+    "Latino": "..",  # Dots
+    "Native American": "xx",  # Crossed lines
+    "Fitzpatrick I": "//",  # Example for Fitzpatrick scales
+    "Fitzpatrick II": "--",
+    "Fitzpatrick III": "..",
+    "Fitzpatrick IV": "||",
+    "Fitzpatrick V": "\\\\",
+    "Fitzpatrick VI": "xx",
     "N/A": "",  # No pattern
+    "Varying Skin Tones": "++",
+    "Indian": "oo",
+    "Other": "||",
 }
 
 DATASET_INFO = {
@@ -458,11 +468,7 @@ def plot_combined_tree_diagram():
     female = np.array([0 if DATASET_INFO[dataset]["Female"] == "N/A" else DATASET_INFO[dataset]["Female"] for dataset in datasets])
     male = np.array([0 if DATASET_INFO[dataset]["Male"] == "N/A" else DATASET_INFO[dataset]["Male"] for dataset in datasets])
     total = np.array([DATASET_INFO[dataset]["Total"] for dataset in datasets])
-    multi_ethnicity = [DATASET_INFO[dataset]["MultiEthnicity"] for dataset in datasets]
-    ethnicity = [
-        "Multi-Ethnicity" if is_multi else "White"  # Adjust based on your actual ethnicity mapping
-        for is_multi in multi_ethnicity
-    ]
+    ethnicity_mapping = DATA_ETHNICITY_MAPPING
 
     # Avoid division by zero for missing gender data
     total[total == 0] = 1
@@ -477,12 +483,19 @@ def plot_combined_tree_diagram():
 
     # Left bar for papers (negative values for left side)
     for i, dataset in enumerate(datasets):
-        bar = ax.barh(
-            i, -papers_pct[i], color="white", edgecolor="#000000", hatch=ETHNICITY_PATTERNS[ethnicity[i]],
-            label=ethnicity[i] if i == 0 or ethnicity[i] not in ethnicity[:i] else None
-        )
+        ethnicity_list = ethnicity_mapping.get(dataset, ["N/A"])
+        n_ethnicities = len(ethnicity_list)
+
+        # Divide the bar into sections based on the number of ethnicities
+        for j, ethnicity in enumerate(ethnicity_list):
+            bar_start = -papers_pct[i] * (j / n_ethnicities)
+            bar_end = -papers_pct[i] * ((j + 1) / n_ethnicities)
+            ax.barh(
+                i, bar_end - bar_start, left=bar_start, color="white", edgecolor="black",
+                hatch=ETHNICITY_PATTERNS.get(ethnicity, ""), label=ethnicity if i == 0 or ethnicity not in ethnicity_list[:i] else None
+            )
         # Add the label for the number of articles
-        ax.text(-papers_pct[i] - 5, i, f"{papers[i]}", va='center', ha='right', fontsize=10, color="black")
+        ax.text(-papers_pct[i] - 5, i, f"{papers[i]} papers", va='center', ha='right', fontsize=10, color="black")
 
     # Right stacked bar for gender distribution (percentage scale)
     for i, dataset in enumerate(datasets):
@@ -500,8 +513,10 @@ def plot_combined_tree_diagram():
             # Percentages in the middle of each bar
             ax.text(female_pct[i] / 2, i, f"{female_pct[i]}%", va='center', ha='center', fontsize=9, color="white")
             ax.text(female_pct[i] + male_pct[i] / 2, i, f"{male_pct[i]}%", va='center', ha='center', fontsize=9, color="white")
-        # Total participants at the end of the bar
-        ax.text(105, i, f"{total_val}", va='center', ha='left', fontsize=10, color="black")
+            # Total participants at the end of the bar
+            ax.text(105, i, f"{total_val}", va='center', ha='left', fontsize=10, color="black")
+        else:
+            ax.text(105, i, "N/A", va='center', ha='left', fontsize=10, color="black")
 
     # Customize
     ax.set_yticks(range(len(datasets)))
