@@ -1,6 +1,7 @@
 from scipy.stats import mannwhitneyu
 
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import seaborn as sns
 import pandas as pd
 import numpy as np
@@ -42,6 +43,16 @@ DATA_ETHNICITY_MAPPING = {
     "ECG Fitness": ["N/A"],
     "MERL": ["Varying Skin Tones"],
     "DEAP": ["N/A"]
+}
+
+# Define patterns for each ethnicity
+ETHNICITY_PATTERNS = {
+    "Asian": "//",  # Diagonal stripes
+    "White": "--",  # Horizontal lines
+    "Black": "\\\\",  # Backward diagonal stripes
+    "Multi-Ethnicity": "xx",  # Crossed lines
+    "Other": "||",  # Vertical stripes
+    "N/A": "",  # No pattern
 }
 
 DATASET_INFO = {
@@ -448,6 +459,10 @@ def plot_combined_tree_diagram():
     male = np.array([0 if DATASET_INFO[dataset]["Male"] == "N/A" else DATASET_INFO[dataset]["Male"] for dataset in datasets])
     total = np.array([DATASET_INFO[dataset]["Total"] for dataset in datasets])
     multi_ethnicity = [DATASET_INFO[dataset]["MultiEthnicity"] for dataset in datasets]
+    ethnicity = [
+        "Multi-Ethnicity" if is_multi else "White"  # Adjust based on your actual ethnicity mapping
+        for is_multi in multi_ethnicity
+    ]
 
     # Avoid division by zero for missing gender data
     total[total == 0] = 1
@@ -457,14 +472,17 @@ def plot_combined_tree_diagram():
     male_pct = (male / total * 100).astype(int, copy=False)
     papers_pct = (papers / papers.max() * 100).astype(int)
 
-    # Colors for multi-ethnicity and non-multi-ethnicity datasets
-    multi_ethnicity_colors = ["#44AA99" if is_multi else "#CC6677" for is_multi in multi_ethnicity]
-
     # Plotting
     fig, ax = plt.subplots(figsize=(20, 12))
 
     # Left bar for papers (negative values for left side)
-    ax.barh(datasets, -papers_pct, color=multi_ethnicity_colors, label="Dataset Usage (Papers)")
+    for i, dataset in enumerate(datasets):
+        bar = ax.barh(
+            i, -papers_pct[i], color="white", edgecolor="#000000", hatch=ETHNICITY_PATTERNS[ethnicity[i]],
+            label=ethnicity[i] if i == 0 or ethnicity[i] not in ethnicity[:i] else None
+        )
+        # Add the label for the number of articles
+        ax.text(-papers_pct[i] - 5, i, f"{papers[i]}", va='center', ha='right', fontsize=10, color="black")
 
     # Right stacked bar for gender distribution (percentage scale)
     for i, dataset in enumerate(datasets):
@@ -482,14 +500,8 @@ def plot_combined_tree_diagram():
             # Percentages in the middle of each bar
             ax.text(female_pct[i] / 2, i, f"{female_pct[i]}%", va='center', ha='center', fontsize=9, color="white")
             ax.text(female_pct[i] + male_pct[i] / 2, i, f"{male_pct[i]}%", va='center', ha='center', fontsize=9, color="white")
-            # Total participants at the end of the bar
-            ax.text(105, i, f"{total_val}", va='center', ha='left', fontsize=10, color="black")
-        else:
-            ax.text(105, i, f"{total_val}", va='center', ha='left', fontsize=10, color="black")
-
-    # Adding labels for number of papers (left bars)
-    for i, val in enumerate(papers):
-        ax.text(-papers_pct[i] - 5, i, f"{val} papers", va='center', ha='right', fontsize=10, color="black")
+        # Total participants at the end of the bar
+        ax.text(105, i, f"{total_val}", va='center', ha='left', fontsize=10, color="black")
 
     # Customize
     ax.set_yticks(range(len(datasets)))
@@ -503,18 +515,18 @@ def plot_combined_tree_diagram():
     ax.set_xticks(np.concatenate((-xticks[::-1][1:], xticks)))  # Mirror ticks for left and right
     ax.set_xticklabels([f"{abs(t)}%" for t in np.concatenate((-xticks[::-1][1:], xticks))], fontsize=10)
 
-    # Add legends
-    ax.legend(
-        handles=[
-            plt.Line2D([0], [0], color="#44AA99", lw=4, label="Multi-Ethnicity Dataset"),
-            plt.Line2D([0], [0], color="#CC6677", lw=4, label="Single-Ethnicity Dataset"),
-            plt.Line2D([0], [0], color="#88CCEE", lw=4, label="Female Subjects"),
-            plt.Line2D([0], [0], color="#CC6677", lw=4, label="Male Subjects"),
-            plt.Line2D([0], [0], color="gray", lw=4, label="No Gender Info"),
-        ],
-        loc="lower right",
-        fontsize=12
-    )
+    # Add legends for ethnicity patterns
+    ethnicity_handles = [
+        mpatches.Patch(facecolor="white", edgecolor="black", hatch=ETHNICITY_PATTERNS[ethnicity], label=ethnicity)
+        for ethnicity in ETHNICITY_PATTERNS.keys() if ethnicity != "N/A"
+    ]
+    gender_handles = [
+        plt.Line2D([0], [0], color="#88CCEE", lw=4, label="Female Subjects"),
+        plt.Line2D([0], [0], color="#CC6677", lw=4, label="Male Subjects"),
+        plt.Line2D([0], [0], color="gray", lw=4, label="No Gender Info"),
+    ]
+
+    ax.legend(handles=ethnicity_handles + gender_handles, loc="lower right", fontsize=12)
 
     plt.tight_layout()
     plt.show()
