@@ -65,6 +65,25 @@ ETHNICITY_PATTERNS = {
     "Other": "||",
 }
 
+# Define colors for each ethnicity
+ETHNICITY_COLORS = {
+    "White": "#E69F00",        # Orange
+    "Asian": "#56B4E9",        # Sky Blue
+    "Black": "#009E73",        # Green
+    "Caucasian": "#F0E442",    # Yellow
+    "Latino": "#0072B2",       # Blue
+    "Native American": "#D55E00",  # Vermilion
+    "Fitzpatrick I": "#CC79A7",    # Pink
+    "Fitzpatrick II": "#E69F00",   # Orange
+    "Fitzpatrick III": "#56B4E9",  # Sky Blue
+    "Fitzpatrick IV": "#009E73",   # Green
+    "Fitzpatrick V": "#F0E442",    # Yellow
+    "Fitzpatrick VI": "#0072B2",   # Blue
+    "N/A": "gray",                 # Gray for undefined ethnicity
+    "Varying Skin Tones": "#D55E00",  # Vermilion
+    "Indian": "#CC79A7",           # Pink
+}
+
 DATASET_INFO = {
     "UBFC-rPPG": {
         "Papers": 52,
@@ -474,9 +493,18 @@ def plot_combined_tree_diagram():
     total[total == 0] = 1
 
     # Calculate percentages
-    female_pct = (female / total * 100).astype(int, copy=False)
-    male_pct = (male / total * 100).astype(int, copy=False)
+    female_pct = (female / total * 100).astype(float)
+    male_pct = (male / total * 100).astype(float)
     papers_pct = (papers / papers.max() * 100).astype(int)
+
+    # Normalize percentages to ensure bars always sum to 100%
+    for i in range(len(female_pct)):
+        if female_pct[i] + male_pct[i] > 100:
+            # Adjust to exactly 100% in case of rounding errors
+            male_pct[i] = 100 - female_pct[i]
+        elif female_pct[i] + male_pct[i] < 100:
+            # Fill the remaining percentage to male
+            male_pct[i] = 100 - female_pct[i]
 
     # Plotting
     fig, ax = plt.subplots(figsize=(20, 12))
@@ -491,32 +519,31 @@ def plot_combined_tree_diagram():
             bar_start = -papers_pct[i] * (j / n_ethnicities)
             bar_end = -papers_pct[i] * ((j + 1) / n_ethnicities)
             ax.barh(
-                i, bar_end - bar_start, left=bar_start, color="white", edgecolor="black",
-                hatch=ETHNICITY_PATTERNS.get(ethnicity, ""), label=ethnicity if i == 0 or ethnicity not in ethnicity_list[:i] else None
+                i, bar_end - bar_start, left=bar_start, color=ETHNICITY_COLORS.get(ethnicity, "gray"),
+                edgecolor="black", label=ethnicity if i == 0 or ethnicity not in ethnicity_list[:i] else None
             )
         # Add the label for the number of articles
-        ax.text(-papers_pct[i] - 5, i, f"{papers[i]} papers", va='center', ha='right', fontsize=10, color="black")
+        ax.text(-papers_pct[i] - 5, i, f"{papers[i]}", va='center', ha='right', fontsize=10, color="black")
 
-    # Right stacked bar for gender distribution (percentage scale)
+    # Right stacked bar for gender distribution (normalized to 100%)
     for i, dataset in enumerate(datasets):
         if female[i] == 0 and male[i] == 0:
             # No gender data, use one color for the entire bar
             ax.barh(i, 100, color="gray", label="No Gender Info" if i == 0 else None)
         else:
-            # Ensure total width is fixed at 100%
-            ax.barh(i, female_pct[i], color="#88CCEE", label="Female Subjects" if i == 0 else None)
-            ax.barh(i, male_pct[i], left=female_pct[i], color="#CC6677", label="Male Subjects" if i == 0 else None)
+            ax.barh(i, female_pct[i], color="#CC6677", label="Female Subjects" if i == 0 else None)
+            ax.barh(i, male_pct[i], left=female_pct[i], color="#88CCEE", label="Male Subjects" if i == 0 else None)
 
     # Adding percentage and total participants for each dataset on the right
     for i, total_val in enumerate(total):
         if female[i] + male[i] > 0:
             # Percentages in the middle of each bar
-            ax.text(female_pct[i] / 2, i, f"{female_pct[i]}%", va='center', ha='center', fontsize=9, color="white")
-            ax.text(female_pct[i] + male_pct[i] / 2, i, f"{male_pct[i]}%", va='center', ha='center', fontsize=9, color="white")
-            # Total participants at the end of the bar
-            ax.text(105, i, f"{total_val}", va='center', ha='left', fontsize=10, color="black")
+            ax.text(female_pct[i] / 2, i, f"{int(female_pct[i])}%", va='center', ha='center', fontsize=9, color="white")
+            ax.text(female_pct[i] + male_pct[i] / 2, i, f"{int(male_pct[i])}%", va='center', ha='center', fontsize=9, color="white")
         else:
-            ax.text(105, i, "N/A", va='center', ha='left', fontsize=10, color="black")
+            ax.text(50, i, "N/A", va='center', ha='center', fontsize=9, color="white")
+        # Total participants at the end of the bar
+        ax.text(105, i, f"{total_val}", va='center', ha='left', fontsize=10, color="black")
 
     # Customize
     ax.set_yticks(range(len(datasets)))
@@ -530,18 +557,18 @@ def plot_combined_tree_diagram():
     ax.set_xticks(np.concatenate((-xticks[::-1][1:], xticks)))  # Mirror ticks for left and right
     ax.set_xticklabels([f"{abs(t)}%" for t in np.concatenate((-xticks[::-1][1:], xticks))], fontsize=10)
 
-    # Add legends for ethnicity patterns
+    # Add legends for ethnicity colors
     ethnicity_handles = [
-        mpatches.Patch(facecolor="white", edgecolor="black", hatch=ETHNICITY_PATTERNS[ethnicity], label=ethnicity)
-        for ethnicity in ETHNICITY_PATTERNS.keys() if ethnicity != "N/A"
+        mpatches.Patch(color=ETHNICITY_COLORS[ethnicity], label=ethnicity)
+        for ethnicity in ETHNICITY_COLORS.keys() if ethnicity != "N/A"
     ]
     gender_handles = [
-        plt.Line2D([0], [0], color="#88CCEE", lw=4, label="Female Subjects"),
-        plt.Line2D([0], [0], color="#CC6677", lw=4, label="Male Subjects"),
+        plt.Line2D([0], [0], color="#CC6677", lw=4, label="Female Subjects"),
+        plt.Line2D([0], [0], color="#88CCEE", lw=4, label="Male Subjects"),
         plt.Line2D([0], [0], color="gray", lw=4, label="No Gender Info"),
     ]
 
-    ax.legend(handles=ethnicity_handles + gender_handles, loc="lower right", fontsize=12)
+    ax.legend(handles=ethnicity_handles + gender_handles, loc="upper left", fontsize=12)
 
     plt.tight_layout()
     plt.show()
