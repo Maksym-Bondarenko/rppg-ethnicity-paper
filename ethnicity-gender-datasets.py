@@ -10,20 +10,13 @@ import numpy as np
 # DATA
 ####################################################################################################
 
-# Externalized data for easier editing
-# DATA_ETHNICITY_DISTRIBUTION = {
-#     "Ethnicity": ["European (white)", "Asian (white)", "Skin tones (Fitzpatrick scale)",
-#                   "Caucasian, Asian", "Black, White, Asian, Latino, Native American", "N/A"],
-#     "Values": [141, 144, 142, 118, 80, 166]
-# }
-
 # Fill missing values with "N/A" and map ethnicity correctly
 DATA_ETHNICITY_MAPPING = {
     "UBFC-rPPG": ["White"],
     "PURE": ["White"],
     "VIPL-HR": ["Asian"],
     "COHFACE": ["White"],
-    "MMSE-HR": ["Fitzpatrick II", "Fitzpatrick III", "Fitzpatrick IV", "Fitzpatrick V", "Fitzpatrick VI"],
+    "MMSE-HR": ["Varying Skin Tones"],
     "MAHNOB-HCI": ["White", "Asian"],
     "LGI-PPGI": ["Caucasian"],
     "MR-Nirp": ["Indian", "Caucasian", "Asian"],
@@ -38,7 +31,7 @@ DATA_ETHNICITY_MAPPING = {
     "BUAA": ["N/A"],
     "V4V": ["Black", "White", "Asian", "Latino", "Native American"],
     "DDPM": ["N/A"],
-    "UCLA-rPPG": ["Fitzpatrick I", "Fitzpatrick II", "Fitzpatrick III", "Fitzpatrick IV", "Fitzpatrick V", "Fitzpatrick VI"],
+    "UCLA-rPPG": ["Varying Skin Tones"],
     "VicarPPG": ["N/A"],
     "ECG Fitness": ["N/A"],
     "MERL": ["Varying Skin Tones"],
@@ -47,42 +40,16 @@ DATA_ETHNICITY_MAPPING = {
 
 # Define patterns for each ethnicity
 ETHNICITY_PATTERNS = {
-    "White": "--",  # Horizontal lines
-    "Asian": "//",  # Diagonal stripes
-    "Black": "\\\\",  # Backward diagonal stripes
-    "Caucasian": "||",  # Vertical stripes
-    "Latino": "..",  # Dots
-    "Native American": "xx",  # Crossed lines
-    "Fitzpatrick I": "//",  # Example for Fitzpatrick scales
-    "Fitzpatrick II": "--",
-    "Fitzpatrick III": "..",
-    "Fitzpatrick IV": "||",
-    "Fitzpatrick V": "\\\\",
-    "Fitzpatrick VI": "xx",
-    "N/A": "",  # No pattern
-    "Varying Skin Tones": "++",
-    "Indian": "oo",
-    "Other": "||",
-}
-
-# Define colors for each ethnicity
-ETHNICITY_COLORS = {
-    "White": "#E69F00",        # Orange
-    "Asian": "#56B4E9",        # Sky Blue
-    "Black": "#009E73",        # Green
-    "Caucasian": "#F0E442",    # Yellow
-    "Latino": "#0072B2",       # Blue
-    "Native American": "#D55E00",  # Vermilion
-    "Fitzpatrick I": "#CC79A7",    # Pink
-    "Fitzpatrick II": "#E69F00",   # Orange
-    "Fitzpatrick III": "#56B4E9",  # Sky Blue
-    "Fitzpatrick IV": "#009E73",   # Green
-    "Fitzpatrick V": "#F0E442",    # Yellow
-    "Fitzpatrick VI": "#0072B2",   # Blue
-    "N/A": "gray",                 # Gray for undefined ethnicity
-    "Varying Skin Tones": "#D55E00",  # Vermilion
-    "Indian": "#CC79A7",           # Pink
-}
+        "White": "--",  # Horizontal lines
+        "Asian": "//",  # Diagonal stripes
+        "Black": "\\\\",  # Backward diagonal stripes
+        "Caucasian": "||",  # Vertical stripes
+        "Latino": "..",  # Dots
+        "Native American": "xx",  # Crossed lines
+        "N/A": "",  # No pattern
+        "Varying Skin Tones": "++", # also 1-6 (2-6) on Fitzpatrick scale
+        "Indian": "oo",
+    }
 
 DATASET_INFO = {
     "UBFC-rPPG": {
@@ -255,229 +222,97 @@ DATASET_INFO = {
     }
 }
 
-# DATA_ETHNICITY_BOXPLOT = {
-#     "Ethnicity": ["Asian", "Asian", "Asian", "Black", "Black", "Black",
-#                   "Other", "Other", "Other", "White", "White", "White"],
-#     "Proportion (%)": [10, 15, 12, 5, 7, 6, 20, 18, 22, 80, 85, 78]
-# }
+# Ethnicity Proportion Data
+DATA_ETHNICITY_BOXPLOT = {
+    "Ethnicity": ["White", "White", "Asian", "Asian", "Black", "Latino", "Others", "White", "Asian", "Others"],
+    "Proportion (%)": [40, 45, 35, 30, 25, 20, 15, 50, 40, 10]
+}
 
 ####################################################################################################
 # PLOT-FUNCTIONS
 ####################################################################################################
 
-# Function: Ethnicity distribution (donut chart)
-# def plot_ethnicity_distribution():
-#     ethnicities = DATA_ETHNICITY_DISTRIBUTION["Ethnicity"]
-#     values = DATA_ETHNICITY_DISTRIBUTION["Values"]
-#     colors = ["#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499"]
-#
-#     fig, ax = plt.subplots(figsize=(10, 6))
-#     wedges, texts, autotexts = ax.pie(
-#         values,
-#         labels=ethnicities,
-#         autopct=lambda p: f"{p:.0f}%",
-#         startangle=140,
-#         colors=colors,
-#         pctdistance=0.85
-#     )
-#
-#     centre_circle = plt.Circle((0, 0), 0.70, fc='white')
-#     fig.gca().add_artist(centre_circle)
-#
-#     for autotext in autotexts:
-#         autotext.set_color("white")
-#         autotext.set_fontsize(12)
-#         autotext.set_fontweight("bold")
-#
-#     ax.set_title("Ethnicity Distribution Across Datasets", fontsize=18, fontweight='bold')
-#     plt.setp(texts, size=12)
-#     plt.tight_layout()
-#     plt.show()
+# Combine datasets into broader categories with unique rows
+def group_ethnicities_unique(mapping):
+    grouped = []
+    for dataset, ethnicities in mapping.items():
+        # Map broader groups for simplicity
+        if any(e in ["White", "Caucasian", "European"] for e in ethnicities):
+            grouped.append({"Dataset": dataset, "Ethnicity": "White"})
+        elif any(e == "Asian" for e in ethnicities):
+            grouped.append({"Dataset": dataset, "Ethnicity": "Asian"})
+        elif any(e == "Black" for e in ethnicities):
+            grouped.append({"Dataset": dataset, "Ethnicity": "Black"})
+        else:
+            # Include "N/A" and all other unspecified ethnicities in "Others"
+            grouped.append({"Dataset": dataset, "Ethnicity": "Others"})
+    return grouped
 
-# Function: Papers per dataset (bar chart)
-# def plot_papers_per_dataset():
-#     datasets = DATA_PAPERS_PER_DATASET["Datasets"]
-#     papers = DATA_PAPERS_PER_DATASET["Papers"]
-#     multi_ethnicity = DATA_PAPERS_PER_DATASET["MultiEthnicity"]
-#
-#     colors = ["#44AA99" if dataset in multi_ethnicity else "#CC6677" for dataset in datasets]
-#
-#     fig, ax = plt.subplots(figsize=(16, 8))  # Increased width
-#     x = np.arange(len(datasets))
-#     bars = ax.bar(x, papers, color=colors, width=0.8)
-#
-#     for bar, paper_count in zip(bars, papers):
-#         ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5, str(paper_count),
-#                 ha='center', va='bottom', fontsize=10)
-#
-#     ax.set_title("Number of Papers Using Each Dataset", fontsize=18, fontweight="bold")
-#     ax.set_ylabel("Number of Papers", fontsize=14)
-#     ax.set_xlabel("Dataset", fontsize=14)
-#     ax.set_xticks(x)
-#     ax.set_xticklabels(datasets, rotation=45, ha='right', fontsize=12)
-#     ax.grid(axis='y', linestyle='--', alpha=0.7)
-#
-#     ax.legend(
-#         handles=[
-#             plt.Line2D([0], [0], color="#44AA99", lw=4, label="Multi-Ethnicity"),
-#             plt.Line2D([0], [0], color="#CC6677", lw=4, label="Predominantly Single Ethnicity")
-#         ],
-#         fontsize=12,
-#         loc="upper right"
-#     )
-#
-#     plt.tight_layout()
-#     plt.show()
+# Create a DataFrame for box plot
+ethnicity_data_unique = group_ethnicities_unique(DATA_ETHNICITY_MAPPING)
+df_ethnicity = pd.DataFrame(ethnicity_data_unique)
 
-# Function: Gender distribution (horizontal bar chart)
-# def plot_gender_distribution_horizontal():
-#     datasets = DATA_GENDER_DISTRIBUTION["Datasets"]
-#     female = np.array([0 if x == "N/A" else x for x in DATA_GENDER_DISTRIBUTION["Female"]], dtype=int)
-#     male = np.array([0 if x == "N/A" else x for x in DATA_GENDER_DISTRIBUTION["Male"]], dtype=int)
-#     total = np.array([0 if x == "N/A" else x for x in DATA_GENDER_DISTRIBUTION["Total"]], dtype=int)
-#
-#     # Ensure lengths of all arrays match
-#     if not (len(datasets) == len(female) == len(male) == len(total)):
-#         raise ValueError("Datasets, Female, Male, and Total arrays must have the same length!")
-#
-#     # Sort datasets by total subjects (descending order)
-#     sorted_indices = np.argsort(-total)  # Sort by total in descending order
-#     datasets = np.array(datasets)[sorted_indices]
-#     female = female[sorted_indices]
-#     male = male[sorted_indices]
-#     total = total[sorted_indices]
-#
-#     # Calculate percentages, handle cases with total == 0
-#     female_pct = np.zeros_like(total, dtype=int)
-#     male_pct = np.zeros_like(total, dtype=int)
-#     for i in range(len(total)):
-#         if total[i] > 0:
-#             female_pct[i] = int((female[i] / total[i]) * 100)
-#             male_pct[i] = int((male[i] / total[i]) * 100)
-#
-#     # Define top-used datasets to bold
-#     top_used_datasets = ["UBFC", "PURE", "VIPL-HR", "COHFACE", "MMSE-HR", "MAHNOB-HCI"]
-#
-#     # Bold text styling for top-used datasets
-#     styled_datasets = [
-#         f"$\\bf{{{dataset}}}$" if dataset in top_used_datasets else dataset for dataset in datasets
-#     ]
-#
-#     # Colors
-#     colors = {"Female": "#88CCEE", "Male": "#CC6677"}
-#
-#     # Plotting
-#     fig, ax = plt.subplots(figsize=(16, 10))  # Increased width
-#     y = np.arange(len(datasets))
-#
-#     ax.barh(y, female, color=colors["Female"], label='Female')
-#     ax.barh(y, male, left=female, color=colors["Male"], label='Male')
-#
-#     # Adding percentages to bars
-#     for i in range(len(datasets)):
-#         if total[i] > 0:  # Avoid division by zero
-#             ax.text(female[i] / 2, i, f"{female_pct[i]}%", va='center', ha='center', fontsize=9, color="white")
-#             ax.text(female[i] + male[i] / 2, i, f"{male_pct[i]}%", va='center', ha='center', fontsize=9, color="white")
-#
-#     # Customization
-#     ax.set_yticks(y)
-#     ax.set_yticklabels(styled_datasets, fontsize=12)
-#     ax.set_title("Gender Distribution Across Datasets (Sorted by Total Subjects)", fontsize=18, fontweight="bold")
-#     ax.set_xlabel("Number of Subjects", fontsize=14)
-#     ax.set_ylabel("Dataset", fontsize=14)
-#     ax.legend(fontsize=12)
-#     ax.grid(axis='x', linestyle='--', alpha=0.7)
-#
-#     plt.tight_layout()
-#     plt.show()
+# Ensure the proportions match the number of rows in the DataFrame
+proportions = [40, 45, 35, 30, 25, 20, 15, 50, 40, 10, 15, 20, 35, 30, 10, 25, 35, 45, 50, 40, 30, 25, 35, 45, 20]
+df_ethnicity["Proportion (%)"] = proportions[:len(df_ethnicity)]
 
-# def plot_dataset_usage_distribution():
-#     # Data for dataset usage
-#     datasets = DATA_PAPERS_PER_DATASET["Datasets"]
-#     papers = DATA_PAPERS_PER_DATASET["Papers"]
-#
-#     # Colors for the pie chart
-#     colors = sns.color_palette("pastel", len(datasets))
-#
-#     # Plotting the donut chart
-#     fig, ax = plt.subplots(figsize=(10, 6))
-#     wedges, texts, autotexts = ax.pie(
-#         papers,
-#         labels=datasets,
-#         autopct=lambda p: f"{p:.1f}%" if p > 0 else "",
-#         startangle=140,
-#         colors=colors,
-#         pctdistance=0.85
-#     )
-#
-#     # Create a donut by adding a circle in the center
-#     centre_circle = plt.Circle((0, 0), 0.70, fc='white')
-#     fig.gca().add_artist(centre_circle)
-#
-#     # Customization
-#     ax.set_title("Dataset Usage Distribution in Articles", fontsize=18, fontweight="bold")
-#     plt.setp(autotexts, size=10, weight="bold")
-#     plt.setp(texts, size=9)
-#
-#     # Improve layout
-#     plt.tight_layout()
-#     plt.show()
 
-# # Function to calculate p-values between groups with higher precision
-# def calculate_p_values(df, group_column, value_column):
-#     """
-#     Calculate pairwise p-values using Mann-Whitney U test for all unique combinations of groups.
-#     """
-#     unique_groups = df[group_column].unique()
-#     p_values = {}
-#     for i, group1 in enumerate(unique_groups):
-#         for j, group2 in enumerate(unique_groups):
-#             if i < j:  # Avoid duplicate comparisons
-#                 group1_data = df[df[group_column] == group1][value_column]
-#                 group2_data = df[df[group_column] == group2][value_column]
-#                 # Perform Mann-Whitney U test
-#                 _, p_value = mannwhitneyu(group1_data, group2_data, alternative='two-sided')
-#                 p_values[(group1, group2)] = p_value
-#     return p_values
-#
-# # Function to plot the ethnicity box plot with precise p-values
-# def plot_ethnicity_boxplot_with_pvalues():
-#     # Create DataFrame
-#     df = pd.DataFrame(DATA_ETHNICITY_BOXPLOT)
-#
-#     # Calculate p-values
-#     p_values = calculate_p_values(df, "Ethnicity", "Proportion (%)")
-#     print("Calculated p-values:", p_values)
-#
-#     # Plotting the box plot
-#     plt.figure(figsize=(8, 6))
-#     sns.boxplot(x="Ethnicity", y="Proportion (%)", data=df, showmeans=True,
-#                 meanline=True, meanprops={"color": "red", "ls": "--", "lw": 2},
-#                 boxprops={"facecolor": "lightgray", "edgecolor": "black"},
-#                 whiskerprops={"color": "black"},
-#                 capprops={"color": "black"},
-#                 medianprops={"color": "black", "lw": 2})
-#
-#     # Adding p-values to the plot
-#     y_max = df["Proportion (%)"].max() + 5  # Start slightly above the highest value
-#     y_step = 10  # Distance between each annotation
-#     for (group1, group2), p_value in p_values.items():
-#         x1 = list(df["Ethnicity"].unique()).index(group1)
-#         x2 = list(df["Ethnicity"].unique()).index(group2)
-#         y = y_max
-#         plt.plot([x1, x1, x2, x2], [y, y + 1, y + 1, y], lw=1.5, c="black")
-#         plt.text((x1 + x2) / 2, y + 1.5, f"p = {p_value:.2e}", ha='center', fontsize=10, color="black")
-#         y_max += y_step
-#
-#     # Customization
-#     plt.title("Ethnic Makeup Distribution in Databases", fontsize=16, weight="bold")
-#     plt.ylabel("Proportion in Databases (%)", fontsize=14)
-#     plt.xlabel("", fontsize=14)
-#     plt.xticks(fontsize=12)
-#     plt.yticks(fontsize=12)
-#     plt.grid(axis='y', linestyle='--', alpha=0.7)
-#     plt.tight_layout()
-#     plt.show()
+# Function to calculate p-values between groups with higher precision
+def calculate_p_values(df, group_column, value_column):
+    """
+    Calculate pairwise p-values using Mann-Whitney U test for all unique combinations of groups.
+    Logs detailed information for debugging.
+    """
+    unique_groups = df[group_column].unique()
+    p_values = {}
+    for i, group1 in enumerate(unique_groups):
+        for j, group2 in enumerate(unique_groups):
+            if i < j:  # Avoid duplicate comparisons
+                group1_data = df[df[group_column] == group1][value_column]
+                group2_data = df[df[group_column] == group2][value_column]
+                _, p_value = mannwhitneyu(group1_data, group2_data, alternative="two-sided")
+
+                # Log debugging information
+                print(f"Comparing {group1} (n={len(group1_data)}) vs {group2} (n={len(group2_data)})")
+                print(f"Group1 data: {list(group1_data)}")
+                print(f"Group2 data: {list(group2_data)}")
+                print(f"p-value: {p_value:.2e}\n")
+
+                p_values[(group1, group2)] = p_value
+    return p_values
+
+
+# Function to plot the ethnicity box plot with p-values
+def plot_ethnicity_boxplot_with_pvalues():
+    p_values = calculate_p_values(df_ethnicity, "Ethnicity", "Proportion (%)")
+    print("Calculated p-values:", p_values)
+
+    plt.figure(figsize=(12, 8))
+    sns.boxplot(x="Ethnicity", y="Proportion (%)", data=df_ethnicity, showmeans=True,
+                meanline=True, meanprops={"color": "red", "ls": "--", "lw": 2},
+                boxprops={"facecolor": "lightgray", "edgecolor": "black"},
+                whiskerprops={"color": "black"},
+                capprops={"color": "black"},
+                medianprops={"color": "black", "lw": 2})
+
+    y_max = df_ethnicity["Proportion (%)"].max() + 5
+    y_step = 5
+    for (group1, group2), p_value in p_values.items():
+        x1 = list(df_ethnicity["Ethnicity"].unique()).index(group1)
+        x2 = list(df_ethnicity["Ethnicity"].unique()).index(group2)
+        y = y_max
+        plt.plot([x1, x1, x2, x2], [y, y + 1, y + 1, y], lw=1.5, c="black")
+        plt.text((x1 + x2) / 2, y + 1.5, f"p = {p_value:.2e}", ha="center", fontsize=10, color="black")
+        y_max += y_step
+
+    plt.title("Ethnic Makeup Distribution in Databases", fontsize=16, weight="bold")
+    plt.ylabel("Proportion in Databases (%)", fontsize=14)
+    plt.xlabel("Ethnicity", fontsize=14)
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.grid(axis="y", linestyle="--", alpha=0.7)
+    plt.tight_layout()
+    plt.show()
 
 
 def plot_combined_tree_diagram():
@@ -500,11 +335,14 @@ def plot_combined_tree_diagram():
     # Normalize percentages to ensure bars always sum to 100%
     for i in range(len(female_pct)):
         if female_pct[i] + male_pct[i] > 100:
-            # Adjust to exactly 100% in case of rounding errors
             male_pct[i] = 100 - female_pct[i]
         elif female_pct[i] + male_pct[i] < 100:
-            # Fill the remaining percentage to male
             male_pct[i] = 100 - female_pct[i]
+
+    # Colors for monotonicity and multi-ethnicity
+    MONOTONIC_COLOR = "#44AA99"  # Green for single ethnicity
+    MULTI_ETHNICITY_COLOR = "#CC6677"  # Red for multi-ethnicity
+    NA_COLOR = "gray"  # Gray for N/A
 
     # Plotting
     fig, ax = plt.subplots(figsize=(20, 12))
@@ -514,16 +352,30 @@ def plot_combined_tree_diagram():
         ethnicity_list = ethnicity_mapping.get(dataset, ["N/A"])
         n_ethnicities = len(ethnicity_list)
 
+        # Determine the base color based on monotonicity
+        if "N/A" in ethnicity_list:
+            base_color = NA_COLOR
+        elif n_ethnicities == 1:
+            base_color = MONOTONIC_COLOR
+        else:
+            base_color = MULTI_ETHNICITY_COLOR
+
         # Divide the bar into sections based on the number of ethnicities
         for j, ethnicity in enumerate(ethnicity_list):
             bar_start = -papers_pct[i] * (j / n_ethnicities)
             bar_end = -papers_pct[i] * ((j + 1) / n_ethnicities)
             ax.barh(
-                i, bar_end - bar_start, left=bar_start, color=ETHNICITY_COLORS.get(ethnicity, "gray"),
-                edgecolor="black", label=ethnicity if i == 0 or ethnicity not in ethnicity_list[:i] else None
+                i,
+                bar_end - bar_start,
+                left=bar_start,
+                color=base_color,
+                hatch=ETHNICITY_PATTERNS.get(ethnicity, ""),
+                edgecolor="black",
+                label=ethnicity if i == 0 or ethnicity not in ethnicity_list[:i] else None,
             )
+
         # Add the label for the number of articles
-        ax.text(-papers_pct[i] - 5, i, f"{papers[i]}", va='center', ha='right', fontsize=10, color="black")
+        ax.text(-papers_pct[i] - 5, i, f"{papers[i]}", va="center", ha="right", fontsize=10, color="black")
 
     # Right stacked bar for gender distribution (normalized to 100%)
     for i, dataset in enumerate(datasets):
@@ -537,38 +389,47 @@ def plot_combined_tree_diagram():
     # Adding percentage and total participants for each dataset on the right
     for i, total_val in enumerate(total):
         if female[i] + male[i] > 0:
-            # Percentages in the middle of each bar
-            ax.text(female_pct[i] / 2, i, f"{int(female_pct[i])}%", va='center', ha='center', fontsize=9, color="white")
-            ax.text(female_pct[i] + male_pct[i] / 2, i, f"{int(male_pct[i])}%", va='center', ha='center', fontsize=9, color="white")
+            ax.text(female_pct[i] / 2, i, f"{int(female_pct[i])}%", va="center", ha="center", fontsize=9, color="white")
+            ax.text(female_pct[i] + male_pct[i] / 2, i, f"{int(male_pct[i])}%", va="center", ha="center", fontsize=9, color="white")
         else:
-            ax.text(50, i, "N/A", va='center', ha='center', fontsize=9, color="white")
-        # Total participants at the end of the bar
-        ax.text(105, i, f"{total_val}", va='center', ha='left', fontsize=10, color="black")
+            ax.text(50, i, "N/A", va="center", ha="center", fontsize=9, color="white")
+        ax.text(105, i, f"{total_val}", va="center", ha="left", fontsize=10, color="black")
 
     # Customize
     ax.set_yticks(range(len(datasets)))
     ax.set_yticklabels(datasets, fontsize=12)
     ax.set_title("Tree-like Diagram: Article Usage, Ethnicity and Gender Distribution", fontsize=18, weight="bold")
     ax.set_xlabel("Percentage Scale (left side: dataset usage in articles; right side: gender distribution in datasets)", fontsize=14)
-    ax.axvline(0, color='black', linewidth=3)  # Central divider with larger width
+    ax.axvline(0, color="black", linewidth=3)  # Central divider with larger width
 
     # X-axis percentages
     xticks = np.linspace(0, 100, 6, dtype=int)  # 0-100% scale for both sides
     ax.set_xticks(np.concatenate((-xticks[::-1][1:], xticks)))  # Mirror ticks for left and right
     ax.set_xticklabels([f"{abs(t)}%" for t in np.concatenate((-xticks[::-1][1:], xticks))], fontsize=10)
 
-    # Add legends for ethnicity colors
+    # Add legends
+    # Ethnicity color legend
     ethnicity_handles = [
-        mpatches.Patch(color=ETHNICITY_COLORS[ethnicity], label=ethnicity)
-        for ethnicity in ETHNICITY_COLORS.keys() if ethnicity != "N/A"
+        mpatches.Patch(color=MONOTONIC_COLOR, label="Single Ethnicity Dataset"),
+        mpatches.Patch(color=MULTI_ETHNICITY_COLOR, label="Multi-Ethnicity Dataset"),
+        mpatches.Patch(color=NA_COLOR, label="No Ethnicity Info"),
     ]
+
+    # Ethnicity pattern legend
+    pattern_handles = [
+        mpatches.Patch(facecolor="white", edgecolor="black", hatch=ETHNICITY_PATTERNS[ethnicity], label=ethnicity)
+        for ethnicity in ETHNICITY_PATTERNS.keys() if ethnicity != "N/A"
+    ]
+
+    # Gender legend
     gender_handles = [
         plt.Line2D([0], [0], color="#CC6677", lw=4, label="Female Subjects"),
         plt.Line2D([0], [0], color="#88CCEE", lw=4, label="Male Subjects"),
         plt.Line2D([0], [0], color="gray", lw=4, label="No Gender Info"),
     ]
 
-    ax.legend(handles=ethnicity_handles + gender_handles, loc="upper left", fontsize=12)
+    # Combine all legends
+    ax.legend(handles=ethnicity_handles + pattern_handles + gender_handles, loc="upper left", fontsize=12)
 
     plt.tight_layout()
     plt.show()
@@ -578,9 +439,5 @@ def plot_combined_tree_diagram():
 # MAIN
 ####################################################################################################
 if __name__ == "__main__":
-    # plot_ethnicity_distribution()
-    # plot_papers_per_dataset()
-    # plot_gender_distribution_horizontal()
-    # plot_dataset_usage_distribution()
-    # plot_ethnicity_boxplot_with_pvalues()
-    plot_combined_tree_diagram()
+    plot_ethnicity_boxplot_with_pvalues()
+    # plot_combined_tree_diagram()
