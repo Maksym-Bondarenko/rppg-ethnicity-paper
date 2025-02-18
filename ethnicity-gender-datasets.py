@@ -59,6 +59,15 @@ ETHNICITY_PATTERNS = {
     "n/a": ""  # No pattern
 }
 
+FITZPATRICK_SCALE = {
+    "1": "#FDECE0",
+    "2": "#F7D8BF",
+    "3": "#ECC3A0",
+    "4": "#CE9F7C",
+    "5": "#8E5B3F",
+    "6": "#5B3F2A"
+}
+
 DATASET_INFO = {
     "UBFC-rPPG": {
         "Papers": 52,
@@ -403,8 +412,8 @@ def plot_ethnicity_boxplot_with_pvalues():
         plt.text((x1 + x2) * 0.5, y + 1.2, f"p={pv:.2e}", ha="center", va="bottom", fontsize=9)
         y_max += step
 
-    plt.title("Ethnicity Distribution in Databases", fontsize=14, weight="bold")
-    plt.ylabel("Proportion in Databases (%)", fontsize=12)
+    plt.title("Ethnicity Distribution in Public Datasets", fontsize=14, weight="bold")
+    plt.ylabel("Proportion in Datasets (%)", fontsize=12)
     plt.xlabel("Ethnicity", fontsize=12)
     plt.grid(axis="y", linestyle="--", alpha=0.7)
     plt.tight_layout()
@@ -473,42 +482,62 @@ def plot_combined_tree_diagram():
 
         # Add a text label with the actual #papers on the left side
         ax.text(-papers_pct[i] - 3, i, f"{papers[i]}", va="center", ha="right",
-                fontsize=10, color="black")
+                fontsize=18, color="black")
 
     # -- RIGHT side 100% stacked bar for female+male or "N/A" --
     for i, ds in enumerate(datasets):
         if female[i] == 0 and male[i] == 0:
-            # Gray bar for unknown
-            ax.barh(i, 100, color="gray", label="No Gender Info" if i == 0 else None)
+            # White bar with black edge instead of gray
+            ax.barh(
+                i,
+                100,
+                color="white",
+                edgecolor="black",  # Show outline
+                hatch=None,  # No hatching
+                label="No Gender Info" if i == 0 else None
+            )
         else:
             # Pinkish bar for female
-            ax.barh(i, female_pct[i], color="#CC6677", label="Female Subjects" if i == 0 else None)
+            ax.barh(
+                i,
+                female_pct[i],
+                color="#E41A1C",
+                label="Female Subjects" if i == 0 else None
+            )
             # Blueish bar for male
-            ax.barh(i, male_pct[i], left=female_pct[i], color="#88CCEE",
-                    label="Male Subjects" if i == 0 else None)
+            ax.barh(
+                i,
+                male_pct[i],
+                left=female_pct[i],
+                color="#377EB8",
+                label="Male Subjects" if i == 0 else None
+            )
 
     # Add percentage labels for female/male or "N/A"
     for i, val_total in enumerate(total):
         if female[i] + male[i] > 0:
             ax.text(female_pct[i] / 2, i, f"{int(female_pct[i])}%", va="center", ha="center",
-                    fontsize=9, color="white")
+                    fontsize=18, color="white")
             ax.text(female_pct[i] + male_pct[i] / 2, i, f"{int(male_pct[i])}%", va="center",
-                    ha="center", fontsize=9, color="white")
+                    ha="center", fontsize=18, color="white")
         else:
-            ax.text(50, i, "N/A", va="center", ha="center", fontsize=9, color="white")
+            ax.text(50, i, "N/A", va="center", ha="center", fontsize=18, color="black")
         # Also put total subject count out to the right
-        ax.text(103, i, f"{int(val_total)}", va="center", ha="left", fontsize=10, color="black")
+        ax.text(103, i, f"{int(val_total)}", va="center", ha="left", fontsize=18, color="black")
 
     # Y-axis labels = dataset names
     ax.set_yticks(range(len(datasets)))
-    ax.set_yticklabels(datasets, fontsize=12)
+    ax.set_yticklabels(datasets, fontsize=18)
 
     # Title and x-axis label
-    ax.set_title("Tree-like Diagram: Article Usage, Ethnicity and Gender Distribution",
-                 fontsize=18, weight="bold")
+    ax.set_title("Article Usage, Ethnicity and Gender Distribution",
+                 fontsize=26, weight="bold")
     ax.set_xlabel(
-        "Percentage Scale (left side: dataset usage in articles; right side: gender distribution in datasets)",
-        fontsize=14)
+        "Percentage Scale (left side: dataset usage and ethnicity distribution in articles; right side: gender distribution in datasets and their size)",
+        fontsize=18)
+    ax.set_ylabel(
+        "Analyzed Public Datasets",
+        fontsize=18)
 
     # Draw a thick vertical line at x=0 as a divider
     ax.axvline(0, color="black", linewidth=3)
@@ -517,7 +546,7 @@ def plot_combined_tree_diagram():
     xticks = np.linspace(0, 100, 6, dtype=int)  # 0, 20, 40, 60, 80, 100
     ax.set_xticks(np.concatenate((-xticks[::-1][1:], xticks)))
     ax.set_xticklabels([f"{abs(t)}%" for t in np.concatenate((-xticks[::-1][1:], xticks))],
-                       fontsize=10)
+                       fontsize=18)
 
     # Build legends
     # 1) Single vs Multi vs No Ethnicity color
@@ -546,7 +575,7 @@ def plot_combined_tree_diagram():
 
     # Combine them
     ax.legend(handles=ethnicity_handles + pattern_handles + gender_handles,
-              loc="upper left", fontsize=11)
+              loc="upper left", fontsize=16)
 
     plt.tight_layout()
     plt.show()
