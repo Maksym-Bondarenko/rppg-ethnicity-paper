@@ -46,26 +46,24 @@ PROPORTIONS = {
     "Others": [10, 20, 15, 30],
 }
 
-# Define hatches/patterns for each ethnicity
-ETHNICITY_PATTERNS = {
-    "white": "--",  # Horizontal lines
-    "asian": "//",  # Forward diagonal stripes
-    "black": "\\\\",  # Backward diagonal stripes
-    "latino": "..",  # Dots
-    "native american": "xx",  # Crossed lines
-    "varying skin tones": "++",
-    "indian": "oo",
-    "others": "**",
-    "n/a": ""  # No pattern
+# Fitzpatrick scale color codes (I through VI).
+FITZPATRICK_SCALE = {
+    1: "#FDECE0",  # Very fair
+    2: "#F7D8BF",  # Fair / Light
+    3: "#ECC3A0",  # Light / Medium
+    4: "#CE9F7C",  # Moderately brown
+    5: "#8E5B3F",  # Dark brown
+    6: "#5B3F2A",  # Deeply pigmented
 }
 
-FITZPATRICK_SCALE = {
-    "1": "#FDECE0",
-    "2": "#F7D8BF",
-    "3": "#ECC3A0",
-    "4": "#CE9F7C",
-    "5": "#8E5B3F",
-    "6": "#5B3F2A"
+# Foe easier mapping and labeling on the plot
+FITZ_ROMAN = {
+    "#FDECE0": "I",
+    "#F7D8BF": "II",
+    "#ECC3A0": "III",
+    "#CE9F7C": "IV",
+    "#8E5B3F": "V",
+    "#5B3F2A": "VI",
 }
 
 DATASET_INFO = {
@@ -243,57 +241,44 @@ DATASET_INFO = {
 # HELPER FUNCTIONS
 ####################################################################################################
 
+def get_fitz_indices(eth_string):
+    """
+    Return a set of Fitzpatrick indices (1..6) for the given substring
+    rather than a list of color codes, so we can unify them easily.
+    """
+    if not eth_string or eth_string.strip().lower() == "n/a":
+        return set()
+
+    lower_str = eth_string.lower()
+    idxs = set()
+    if "white" in lower_str:
+        idxs.update([1, 2])
+    if "caucasian" in lower_str:
+        idxs.update([1, 2, 3])
+    if "asian" in lower_str:
+        idxs.update([2, 3, 4])
+    if "latino" in lower_str or "native american" in lower_str:
+        idxs.update([3, 4, 5])
+    if "black" in lower_str:
+        idxs.update([5, 6])
+    if "indian" in lower_str:
+        idxs.update([4, 5])
+    if "varying skin tones" in lower_str:
+        idxs.update(range(1, 7))
+    if "fitzpatrick scale" in lower_str:
+        idxs.update(range(1, 7))
+
+    return idxs
+
 def parse_ethnicity_string(eth_string):
     """
-    Safely splits the 'eth_string' on commas (and removes parentheses)
-    then matches each piece to one of our known ETHNICITY_PATTERNS keys.
-    Returns a list of lowercased ethnicities, e.g. ["white","black","asian"].
+    Splits on commas and returns a list of lowercased partial strings,
+    e.g. 'White, Asian' => ['white','asian'].
     """
-    # If not provided or N/A, return ["n/a"] so that we get consistent handling.
     if not eth_string or eth_string.strip().lower() == "n/a":
         return ["n/a"]
-
-    # Lower-case everything and strip parentheses
-    clean_str = eth_string.lower().replace("(", "").replace(")", "")
-    # Split by comma
-    parts = [p.strip() for p in clean_str.split(",")]
-
-    # Our recognized substrings -> pattern keys
-    known_keywords = [
-        "white",
-        "black",
-        "asian",
-        "latino",
-        "native american",
-        "varying skin tones",
-        "indian",
-        "others",
-        "skin colors in fitzpatrick scale",
-        "fitzpatrick"
-    ]
-
-    found_ethnicities = []
-    for p in parts:
-        # Check if any known_keywords appear in this piece
-        matched = False
-        for kw in known_keywords:
-            # e.g. "white" in "european white"
-            # or "native american" in "black, white, asian, latino, native american"
-            if kw in p:
-                # For "skin colors in fitzpatrick scale" or "fitzpatrick" => treat as "varying skin tones"
-                if "fitzpatrick" in kw:
-                    found_ethnicities.append("varying skin tones")
-                else:
-                    found_ethnicities.append(kw)
-                matched = True
-                break
-        if not matched:
-            # If we didn't find a known keyword, treat it as "others" or "n/a"
-            found_ethnicities.append("others")
-
-    # Remove duplicates while preserving order
-    final_list = list(dict.fromkeys(found_ethnicities))
-    return final_list
+    parts = [p.strip().lower() for p in eth_string.split(",")]
+    return parts
 
 def prepare_ethnicity_dataframe():
     """
@@ -419,166 +404,190 @@ def plot_ethnicity_boxplot_with_pvalues():
     plt.tight_layout()
     plt.show()
 
+
 def plot_combined_tree_diagram():
     """
     Plots a 'tree-like' diagram showing:
-      1) Dataset usage in articles (left side) with possible subdivisions for each ethnicity (patterns).
+      1) Dataset usage in articles (left side) subdivided by Fitzpatrick color slices.
       2) Gender distribution (right side) as a 100% stacked bar.
+      3) Ensures no duplicate Fitzpatrick slices (max 6) per dataset.
     """
     datasets = list(DATASET_INFO.keys())
+
+    # Extract arrays
     papers = np.array([DATASET_INFO[ds]["Papers"] for ds in datasets])
     female = np.array([0 if DATASET_INFO[ds]["Female"] == "N/A" else DATASET_INFO[ds]["Female"] for ds in datasets])
     male = np.array([0 if DATASET_INFO[ds]["Male"] == "N/A" else DATASET_INFO[ds]["Male"] for ds in datasets])
     total = np.array([DATASET_INFO[ds]["Total"] for ds in datasets])
 
-    # Avoid division-by-zero
+    # Avoid division by zero
     total[total == 0] = 1
 
     female_pct = (female / total * 100).astype(float)
     male_pct = (male / total * 100).astype(float)
     papers_pct = (papers / papers.max() * 100).astype(int)
 
-    # Colors for "single" vs "multi" vs "N/A" (based on DATASET_INFO or parsing)
-    MONO_COLOR = "#44AA99"  # Green
-    MULTI_COLOR = "#CC6677"  # Reddish
-    NA_COLOR = "gray"
-
     fig, ax = plt.subplots(figsize=(20, 12))
 
-    # -- LEFT side bars for "papers" (mirrored as negative x-values) --
+    # ---------------- LEFT side: usage bars subdivided by *unique* Fitzpatrick colors ----------------
     for i, ds in enumerate(datasets):
-        # Parse the ethnicity string to a list so we can show multiple patterns
         eth_string = DATA_ETHNICITY_MAPPING.get(ds, "N/A")
-        ethnicity_list = parse_ethnicity_string(eth_string)
-        n_ethnicities = len(ethnicity_list)
+        sub_ethnicities = parse_ethnicity_string(eth_string)
 
-        # Decide base color from the "MultiEthnicity" flag or number of ethnicities
-        if "n/a" in ethnicity_list:
-            base_color = NA_COLOR
+        # Collect all Fitzpatrick indices in one set
+        # so we don't duplicate any color slice
+        fitz_index_set = set()
+
+        for sub_eth in sub_ethnicities:
+            if sub_eth == "n/a":
+                continue  # ignore
+            # map_to_fitzpatrick_colors returns a list of color codes,
+            # but let's modify it to return the *indices* for even better dedup
+            # Or: we can keep your existing function, but we need the index logic.
+
+            # We'll do a simpler approach: create a small function inline:
+            indices_for_subeth = get_fitz_indices(sub_eth)  # See helper below
+            fitz_index_set |= indices_for_subeth  # union them
+
+        # If no indices found => no ethnicity => single neutral color
+        if not fitz_index_set:
+            combined_colors = ["#D3D3D3"]  # “no ethnicity info”
         else:
-            # If the dataset is known to have more than one distinct group
-            if DATASET_INFO[ds]["MultiEthnicity"] or n_ethnicities > 1:
-                base_color = MULTI_COLOR
-            else:
-                base_color = MONO_COLOR
+            combined_colors = [FITZPATRICK_SCALE[idx] for idx in sorted(fitz_index_set)]
 
-        # Subdivide the left bar for each ethnicity in 'ethnicity_list'
-        # so each portion has its own hatch pattern
-        for j, ethnicity in enumerate(ethnicity_list):
-            bar_frac_start = j / n_ethnicities
-            bar_frac_end = (j + 1) / n_ethnicities
-            # Convert fraction to negative width on the left side
-            left_edge = -papers_pct[i] * bar_frac_start
-            bar_width = -papers_pct[i] * (bar_frac_end - bar_frac_start)
+        # Subdivide the bar by however many distinct color codes we have
+        n_subs = len(combined_colors)
+        for j, color_code in enumerate(combined_colors):
+            frac_start = j / n_subs
+            frac_end = (j + 1) / n_subs
+            left_edge = -papers_pct[i] * frac_start
+            bar_width = -papers_pct[i] * (frac_end - frac_start)
 
             ax.barh(
                 i,
                 bar_width,
                 left=left_edge,
-                color=base_color,
-                hatch=ETHNICITY_PATTERNS.get(ethnicity, ""),
+                color=color_code,
                 edgecolor="black"
             )
 
-        # Add a text label with the actual #papers on the left side
-        ax.text(-papers_pct[i] - 3, i, f"{papers[i]}", va="center", ha="right",
-                fontsize=18, color="black")
+            # Label the slice with I, II, III, etc.
+            label = FITZ_ROMAN.get(color_code, "")
+            x_center = left_edge + bar_width / 2
+            if abs(bar_width) > 5:  # skip labeling if the segment is too narrow
+                ax.text(
+                    x_center,
+                    i,
+                    label,
+                    ha="center",
+                    va="center",
+                    fontsize=16,
+                    color="black"
+                )
 
-    # -- RIGHT side 100% stacked bar for female+male or "N/A" --
+        # Show the # of papers to the left
+        ax.text(
+            -papers_pct[i] - 3, i,
+            str(papers[i]),
+            va="center", ha="right",
+            fontsize=20, color="black"
+        )
+
+    # ---------------- RIGHT side: 100% stacked bars for female / male (or “N/A”) ----------------
     for i, ds in enumerate(datasets):
         if female[i] == 0 and male[i] == 0:
-            # White bar with black edge instead of gray
             ax.barh(
-                i,
-                100,
+                i, 100,
                 color="white",
-                edgecolor="black",  # Show outline
-                hatch=None,  # No hatching
+                edgecolor="black",
                 label="No Gender Info" if i == 0 else None
             )
         else:
-            # Pinkish bar for female
+            # female
             ax.barh(
-                i,
-                female_pct[i],
+                i, female_pct[i],
                 color="#E41A1C",
                 label="Female Subjects" if i == 0 else None
             )
-            # Blueish bar for male
+            # male
             ax.barh(
-                i,
-                male_pct[i],
+                i, male_pct[i],
                 left=female_pct[i],
                 color="#377EB8",
                 label="Male Subjects" if i == 0 else None
             )
 
-    # Add percentage labels for female/male or "N/A"
+    # Percentage text + total subject count
     for i, val_total in enumerate(total):
         if female[i] + male[i] > 0:
-            ax.text(female_pct[i] / 2, i, f"{int(female_pct[i])}%", va="center", ha="center",
-                    fontsize=18, color="white")
-            ax.text(female_pct[i] + male_pct[i] / 2, i, f"{int(male_pct[i])}%", va="center",
-                    ha="center", fontsize=18, color="white")
+            ax.text(
+                female_pct[i] / 2, i,
+                f"{int(female_pct[i])}%",
+                va="center", ha="center",
+                fontsize=20, color="white"
+            )
+            ax.text(
+                female_pct[i] + male_pct[i] / 2, i,
+                f"{int(male_pct[i])}%",
+                va="center", ha="center",
+                fontsize=20, color="white"
+            )
         else:
-            ax.text(50, i, "N/A", va="center", ha="center", fontsize=18, color="black")
-        # Also put total subject count out to the right
-        ax.text(103, i, f"{int(val_total)}", va="center", ha="left", fontsize=18, color="black")
+            ax.text(50, i, "N/A",
+                    va="center", ha="center",
+                    fontsize=20, color="black")
+        ax.text(103, i,
+                str(int(val_total)),
+                va="center", ha="left",
+                fontsize=20, color="black")
 
-    # Y-axis labels = dataset names
+    # Y-axis labels
     ax.set_yticks(range(len(datasets)))
-    ax.set_yticklabels(datasets, fontsize=18)
+    ax.set_yticklabels(datasets, fontsize=20)
 
-    # Title and x-axis label
-    ax.set_title("Article Usage, Ethnicity and Gender Distribution",
-                 fontsize=26, weight="bold")
+    # Title / labeling
+    ax.set_title(
+        "Article Usage, Ethnicity (Fitzpatrick Scale) and Gender Distribution",
+        fontsize=28, weight="bold"
+    )
     ax.set_xlabel(
-        "Percentage Scale (left side: dataset usage and ethnicity distribution in articles; right side: gender distribution in datasets and their size)",
-        fontsize=18)
-    ax.set_ylabel(
-        "Analyzed Public Datasets",
-        fontsize=18)
+        "Percentage Scale (left side: usage subdivided by Fitzpatrick colors; right side: gender distribution)",
+        fontsize=22
+    )
+    ax.set_ylabel("Analyzed Public Datasets", fontsize=22)
+    ax.axvline(0, color="black", linewidth=3)  # vertical divider
 
-    # Draw a thick vertical line at x=0 as a divider
-    ax.axvline(0, color="black", linewidth=3)
-
-    # Set mirrored x-ticks: from -100% up to +100%
-    xticks = np.linspace(0, 100, 6, dtype=int)  # 0, 20, 40, 60, 80, 100
+    # Mirrored x-ticks
+    xticks = np.linspace(0, 100, 6, dtype=int)
     ax.set_xticks(np.concatenate((-xticks[::-1][1:], xticks)))
-    ax.set_xticklabels([f"{abs(t)}%" for t in np.concatenate((-xticks[::-1][1:], xticks))],
-                       fontsize=18)
+    ax.set_xticklabels(
+        [f"{abs(t)}%" for t in np.concatenate((-xticks[::-1][1:], xticks))],
+        fontsize=18
+    )
 
-    # Build legends
-    # 1) Single vs Multi vs No Ethnicity color
-    ethnicity_handles = [
-        mpatches.Patch(color=MONO_COLOR, label="Single Ethnicity Dataset"),
-        mpatches.Patch(color=MULTI_COLOR, label="Multi-Ethnicity Dataset"),
-        mpatches.Patch(color=NA_COLOR, label="No Ethnicity Info")
-    ]
+    # Legend for Fitzpatrick + female/male/no‐gender + no ethnicity
+    fitz_handles = []
+    for idx in range(1, 7):
+        c = FITZPATRICK_SCALE[idx]
+        label_text = f"Fitzpatrick {FITZ_ROMAN[c]}"
+        fitz_handles.append(mpatches.Patch(facecolor=c, edgecolor="black", label=label_text))
 
-    # 2) Pattern legend (white, asian, black, etc.)
-    pattern_handles = []
-    for eth_key, hatch_style in ETHNICITY_PATTERNS.items():
-        if eth_key != "n/a":  # skip the "n/a" empty hatch
-            # Capitalize it in a friendly way for the label
-            nice_label = eth_key.title().replace("American", "American")
-            patch = mpatches.Patch(facecolor="white", edgecolor="black",
-                                   hatch=hatch_style, label=nice_label)
-            pattern_handles.append(patch)
-
-    # 3) Gender legend
     gender_handles = [
-        plt.Line2D([0], [0], color="#CC6677", lw=8, label="Female Subjects"),
-        plt.Line2D([0], [0], color="#88CCEE", lw=8, label="Male Subjects"),
-        plt.Line2D([0], [0], color="gray", lw=8, label="No Gender Info")
+        mpatches.Patch(color="#E41A1C", label="Female"),
+        mpatches.Patch(color="#377EB8", label="Male"),
+        mpatches.Patch(facecolor="white", edgecolor="black", label="No Gender Info"),
+        mpatches.Patch(facecolor="#D3D3D3", edgecolor="black", label="No Ethnicity Info"),
     ]
 
-    # Combine them
-    ax.legend(handles=ethnicity_handles + pattern_handles + gender_handles,
-              loc="upper left", fontsize=16)
+    ax.legend(
+        handles=fitz_handles + gender_handles,
+        loc="upper left",
+        fontsize=18
+    )
 
     plt.tight_layout()
     plt.show()
+
 
 ####################################################################################################
 # MAIN
