@@ -367,6 +367,7 @@ def calculate_p_values(df, group_column, value_column):
 # PLOTTING FUNCTIONS
 ####################################################################################################
 
+
 def plot_ethnicity_boxplot_with_pvalues():
     df_ethnicity = prepare_ethnicity_dataframe()
     p_vals = calculate_p_values(df_ethnicity, "Ethnicity", "Proportion (%)")
@@ -474,7 +475,7 @@ def plot_combined_tree_diagram():
             # Label the slice with I, II, III, etc.
             label = FITZ_ROMAN.get(color_code, "")
             x_center = left_edge + bar_width / 2
-            if abs(bar_width) > 5:  # skip labeling if the segment is too narrow
+            if abs(bar_width) > 4:  # skip labeling if the segment is too narrow
                 ax.text(
                     x_center,
                     i,
@@ -506,14 +507,16 @@ def plot_combined_tree_diagram():
             # female
             ax.barh(
                 i, female_pct[i],
-                color="#E41A1C",
+                color="#DF65B0",
+                edgecolor="black",
                 label="Female Subjects" if i == 0 else None
             )
             # male
             ax.barh(
                 i, male_pct[i],
                 left=female_pct[i],
-                color="#377EB8",
+                color="#2C7FB8",
+                edgecolor="black",
                 label="Male Subjects" if i == 0 else None
             )
 
@@ -573,8 +576,8 @@ def plot_combined_tree_diagram():
         fitz_handles.append(mpatches.Patch(facecolor=c, edgecolor="black", label=label_text))
 
     gender_handles = [
-        mpatches.Patch(color="#E41A1C", label="Female"),
-        mpatches.Patch(color="#377EB8", label="Male"),
+        mpatches.Patch(facecolor="#E41A1C", edgecolor="black", label="Female"),
+        mpatches.Patch(facecolor="#377EB8", edgecolor="black", label="Male"),
         mpatches.Patch(facecolor="white", edgecolor="black", label="No Gender Info"),
         mpatches.Patch(facecolor="#D3D3D3", edgecolor="black", label="No Ethnicity Info"),
     ]
