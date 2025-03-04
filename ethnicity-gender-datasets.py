@@ -398,7 +398,7 @@ def plot_ethnicity_boxplot_with_pvalues():
         plt.text((x1 + x2) * 0.5, y + 1.2, f"p={pv:.2e}", ha="center", va="bottom", fontsize=9)
         y_max += step
 
-    plt.title("Ethnicity Distribution in Public Datasets", fontsize=14, weight="bold")
+    # plt.title("Ethnicity Distribution in Public Datasets", fontsize=14, weight="bold")
     plt.ylabel("Proportion in Datasets (%)", fontsize=12)
     plt.xlabel("Ethnicity", fontsize=12)
     plt.grid(axis="y", linestyle="--", alpha=0.7)
@@ -409,60 +409,62 @@ def plot_ethnicity_boxplot_with_pvalues():
 def plot_combined_tree_diagram():
     """
     Plots a 'tree-like' diagram showing:
-      1) Dataset usage in articles (left side) subdivided by Fitzpatrick color slices.
-      2) Gender distribution (right side) as a 100% stacked bar.
-      3) Ensures no duplicate Fitzpatrick slices (max 6) per dataset.
+      1) Left side: usage in articles (scaled so max usage=100,
+         subdivided by Fitzpatrick color slices).
+      2) Right side: 100% stacked bar for female / male or N/A.
+      3) Two columns on the far right: total # subjects (in green text),
+         # papers (in purple text).
+      4) Those text colors also appear in the legend as color patches.
     """
+
+    # -- color definitions for the numeric columns --
+    SUBJECTS_COLOR = "#006D2C"  # a dark green, visible on white
+    PAPERS_COLOR   = "#984EA3"  # a purple that stands out
+
     datasets = list(DATASET_INFO.keys())
 
-    # Extract arrays
-    papers = np.array([DATASET_INFO[ds]["Papers"] for ds in datasets])
+    # 1) Extract numeric arrays
+    papers = np.array([DATASET_INFO[ds]["Papers"] for ds in datasets])  # usage
     female = np.array([0 if DATASET_INFO[ds]["Female"] == "N/A" else DATASET_INFO[ds]["Female"] for ds in datasets])
-    male = np.array([0 if DATASET_INFO[ds]["Male"] == "N/A" else DATASET_INFO[ds]["Male"] for ds in datasets])
-    total = np.array([DATASET_INFO[ds]["Total"] for ds in datasets])
+    male   = np.array([0 if DATASET_INFO[ds]["Male"]   == "N/A" else DATASET_INFO[ds]["Male"]   for ds in datasets])
+    total  = np.array([DATASET_INFO[ds]["Total"]       for ds in datasets])
+    total[total == 0] = 1  # avoid div by zero
 
-    # Avoid division by zero
-    total[total == 0] = 1
-
-    female_pct = (female / total * 100).astype(float)
-    male_pct = (male / total * 100).astype(float)
-    papers_pct = (papers / papers.max() * 100).astype(int)
+    female_pct = (female / total) * 100.0
+    male_pct   = (male   / total) * 100.0
+    max_usage  = papers.max()  # largest # of articles in any dataset
 
     fig, ax = plt.subplots(figsize=(20, 12))
 
-    # ---------------- LEFT side: usage bars subdivided by *unique* Fitzpatrick colors ----------------
+    # ---------- LEFT side: scaled usage so max => 100, subdivided by Fitzpatrick colors ----------
     for i, ds in enumerate(datasets):
         eth_string = DATA_ETHNICITY_MAPPING.get(ds, "N/A")
         sub_ethnicities = parse_ethnicity_string(eth_string)
 
-        # Collect all Fitzpatrick indices in one set
-        # so we don't duplicate any color slice
         fitz_index_set = set()
-
         for sub_eth in sub_ethnicities:
             if sub_eth == "n/a":
-                continue  # ignore
-            # map_to_fitzpatrick_colors returns a list of color codes,
-            # but let's modify it to return the *indices* for even better dedup
-            # Or: we can keep your existing function, but we need the index logic.
+                continue
+            fitz_index_set |= get_fitz_indices(sub_eth)
 
-            # We'll do a simpler approach: create a small function inline:
-            indices_for_subeth = get_fitz_indices(sub_eth)  # See helper below
-            fitz_index_set |= indices_for_subeth  # union them
-
-        # If no indices found => no ethnicity => single neutral color
+        # If no ethnicity => single neutral color
         if not fitz_index_set:
-            combined_colors = ["#D3D3D3"]  # “no ethnicity info”
+            combined_colors = ["#D3D3D3"]  # No Ethnicity
         else:
             combined_colors = [FITZPATRICK_SCALE[idx] for idx in sorted(fitz_index_set)]
 
-        # Subdivide the bar by however many distinct color codes we have
+        usage_abs = papers[i]
+        usage_scaled = usage_abs * (100.0 / max_usage)  # scale usage to 0..100
+
         n_subs = len(combined_colors)
         for j, color_code in enumerate(combined_colors):
             frac_start = j / n_subs
-            frac_end = (j + 1) / n_subs
-            left_edge = -papers_pct[i] * frac_start
-            bar_width = -papers_pct[i] * (frac_end - frac_start)
+            frac_end   = (j + 1) / n_subs
+
+            seg_start  = usage_scaled * frac_start
+            seg_end    = usage_scaled * frac_end
+            bar_width  = -(seg_end - seg_start)   # negative for left side
+            left_edge  = -seg_start
 
             ax.barh(
                 i,
@@ -472,31 +474,19 @@ def plot_combined_tree_diagram():
                 edgecolor="black"
             )
 
-            # Label the slice with I, II, III, etc.
             label = FITZ_ROMAN.get(color_code, "")
             x_center = left_edge + bar_width / 2
-            if abs(bar_width) > 4:  # skip labeling if the segment is too narrow
+            if abs(bar_width) > 4:
                 ax.text(
-                    x_center,
-                    i,
-                    label,
-                    ha="center",
-                    va="center",
-                    fontsize=16,
-                    color="black"
+                    x_center, i, label,
+                    ha="center", va="center",
+                    fontsize=16, color="black"
                 )
 
-        # Show the # of papers to the left
-        ax.text(
-            -papers_pct[i] - 3, i,
-            str(papers[i]),
-            va="center", ha="right",
-            fontsize=20, color="black"
-        )
-
-    # ---------------- RIGHT side: 100% stacked bars for female / male (or “N/A”) ----------------
+    # ---------- RIGHT side: 100% stacked bars for female/male (or N/A) ----------
     for i, ds in enumerate(datasets):
         if female[i] == 0 and male[i] == 0:
+            # No Gender Info
             ax.barh(
                 i, 100,
                 color="white",
@@ -504,14 +494,14 @@ def plot_combined_tree_diagram():
                 label="No Gender Info" if i == 0 else None
             )
         else:
-            # female
+            # Female
             ax.barh(
                 i, female_pct[i],
                 color="#DF65B0",
                 edgecolor="black",
                 label="Female Subjects" if i == 0 else None
             )
-            # male
+            # Male
             ax.barh(
                 i, male_pct[i],
                 left=female_pct[i],
@@ -520,55 +510,75 @@ def plot_combined_tree_diagram():
                 label="Male Subjects" if i == 0 else None
             )
 
-    # Percentage text + total subject count
+    # ---------- Right-side text for female% / male%, plus columns for #subjects & #papers ----------
     for i, val_total in enumerate(total):
+        # female% & male% in the middle of each color wedge
         if female[i] + male[i] > 0:
             ax.text(
-                female_pct[i] / 2, i,
-                f"{int(female_pct[i])}%",
-                va="center", ha="center",
-                fontsize=20, color="white"
+                female_pct[i] / 2, i, f"{int(female_pct[i])}%",
+                ha="center", va="center", fontsize=20, color="white"
             )
             ax.text(
-                female_pct[i] + male_pct[i] / 2, i,
-                f"{int(male_pct[i])}%",
-                va="center", ha="center",
-                fontsize=20, color="white"
+                female_pct[i] + male_pct[i] / 2, i, f"{int(male_pct[i])}%",
+                ha="center", va="center", fontsize=20, color="white"
             )
         else:
-            ax.text(50, i, "N/A",
-                    va="center", ha="center",
-                    fontsize=20, color="black")
-        ax.text(103, i,
-                str(int(val_total)),
-                va="center", ha="left",
-                fontsize=20, color="black")
+            ax.text(
+                50, i, "N/A",
+                ha="center", va="center", fontsize=20, color="black"
+            )
 
-    # Y-axis labels
+        # Now place total # subjects (in green)
+        ax.text(
+            102, i, str(int(val_total)),
+            ha="left", va="center",
+            fontsize=20, color=SUBJECTS_COLOR
+        )
+        # And # papers (in purple)
+        ax.text(
+            115, i, str(papers[i]),
+            ha="left", va="center",
+            fontsize=20, color=PAPERS_COLOR
+        )
+
+    # ---------- Y-axis ----------
     ax.set_yticks(range(len(datasets)))
     ax.set_yticklabels(datasets, fontsize=20)
 
-    # Title / labeling
-    ax.set_title(
-        "Article Usage, Ethnicity (Fitzpatrick Scale) and Gender Distribution",
-        fontsize=28, weight="bold"
-    )
-    ax.set_xlabel(
-        "Percentage Scale (left side: usage subdivided by Fitzpatrick colors; right side: gender distribution)",
-        fontsize=22
-    )
+    # ---------- Title and axis labels ----------
+    # ax.set_title(
+    #     "Article Usage, Ethnicity (Fitzpatrick Scale) and Gender Distribution",
+    #     fontsize=28, weight="bold"
+    # )
+    # ax.set_xlabel(
+    #     "Scaled Articles (left) vs. Gender % (right) — Both sides = 100",
+    #     fontsize=22
+    # )
     ax.set_ylabel("Analyzed Public Datasets", fontsize=22)
+
     ax.axvline(0, color="black", linewidth=3)  # vertical divider
 
-    # Mirrored x-ticks
-    xticks = np.linspace(0, 100, 6, dtype=int)
-    ax.set_xticks(np.concatenate((-xticks[::-1][1:], xticks)))
-    ax.set_xticklabels(
-        [f"{abs(t)}%" for t in np.concatenate((-xticks[::-1][1:], xticks))],
-        fontsize=18
-    )
+    # ---------- X-axis ticks (mirrored) ----------
+    step_size = 10
+    usage_vals = np.arange(0, max_usage + 1, step_size)
+    usage_positions = -usage_vals * (100.0 / max_usage)  # negative side
+    right_ticks = np.arange(0, 101, 20)                  # 0..100 for gender
 
-    # Legend for Fitzpatrick + female/male/no‐gender + no ethnicity
+    all_ticks = np.concatenate([usage_positions[::-1], right_ticks[1:]])
+    # e.g. [-100, -80, ... 0, 20, 40, 60, 80, 100]
+    ax.set_xticks(all_ticks)
+
+    tick_labels = []
+    for t in all_ticks:
+        if t < 0:
+            # invert scaling to show actual usage
+            usage_val = -t * (max_usage / 100.0)
+            tick_labels.append(str(int(usage_val)))
+        else:
+            tick_labels.append(f"{int(t)}%")
+    ax.set_xticklabels(tick_labels, fontsize=18)
+
+    # ---------- Legend ----------
     fitz_handles = []
     for idx in range(1, 7):
         c = FITZPATRICK_SCALE[idx]
@@ -576,14 +586,20 @@ def plot_combined_tree_diagram():
         fitz_handles.append(mpatches.Patch(facecolor=c, edgecolor="black", label=label_text))
 
     gender_handles = [
-        mpatches.Patch(facecolor="#E41A1C", edgecolor="black", label="Female"),
-        mpatches.Patch(facecolor="#377EB8", edgecolor="black", label="Male"),
-        mpatches.Patch(facecolor="white", edgecolor="black", label="No Gender Info"),
+        mpatches.Patch(facecolor="#DF65B0", edgecolor="black", label="Female"),
+        mpatches.Patch(facecolor="#2C7FB8", edgecolor="black", label="Male"),
+        mpatches.Patch(facecolor="white",   edgecolor="black", label="No Gender Info"),
         mpatches.Patch(facecolor="#D3D3D3", edgecolor="black", label="No Ethnicity Info"),
     ]
 
+    # Add handles for the right-column text colors
+    columns_handles = [
+        mpatches.Patch(facecolor=SUBJECTS_COLOR, edgecolor="black", label="Total # Subjects (Text)"),
+        mpatches.Patch(facecolor=PAPERS_COLOR,   edgecolor="black", label="# Papers (Text)")
+    ]
+
     ax.legend(
-        handles=fitz_handles + gender_handles,
+        handles=fitz_handles + gender_handles + columns_handles,
         loc="upper left",
         fontsize=18
     )
