@@ -3,12 +3,27 @@ from scipy.stats import mannwhitneyu
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import seaborn as sns
+
+import matplotlib as mpl
 import pandas as pd
 import numpy as np
 
 ####################################################################################################
 # DATA
 ####################################################################################################
+
+# Set consistent LaTeX-style font and size
+mpl.rcParams.update({
+    "font.family": "serif",        # Use serif font like in LaTeX
+    "font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
+    "font.size": 16,               # Matches 10pt LaTeX document
+    "axes.titlesize": 16,
+    "axes.labelsize": 16,
+    "xtick.labelsize": 16,
+    "ytick.labelsize": 16,
+    "legend.fontsize": 16,
+    "figure.titlesize": 16
+})
 
 # Ethnicity of subjects in dataset
 DATA_ETHNICITY_MAPPING = {
@@ -395,12 +410,12 @@ def plot_ethnicity_boxplot_with_pvalues():
         x2 = unique_groups.index(g2)
         y = y_max
         plt.plot([x1, x1, x2, x2], [y, y + 1, y + 1, y], lw=1.5, c="black")
-        plt.text((x1 + x2) * 0.5, y + 1.2, f"p={pv:.2e}", ha="center", va="bottom", fontsize=9)
+        plt.text((x1 + x2) * 0.5, y + 1.2, f"p={pv:.2e}", ha="center", va="bottom", fontsize=16)
         y_max += step
 
     # plt.title("Ethnicity Distribution in Public Datasets", fontsize=14, weight="bold")
-    plt.ylabel("Proportion in Datasets (%)", fontsize=12)
-    plt.xlabel("Ethnicity", fontsize=12)
+    plt.ylabel("Proportion in Datasets (%)", fontsize=16)
+    plt.xlabel("Ethnicity", fontsize=16)
     plt.grid(axis="y", linestyle="--", alpha=0.7)
     plt.tight_layout()
     plt.show()
@@ -486,7 +501,7 @@ def plot_combined_tree_diagram():
                     ax.text(
                         left_edge + bar_width / 2, i, label,
                         ha="center", va="center",
-                        fontsize=12, color="black"
+                        fontsize=18, color="black"
                     )
 
     # ---------- RIGHT side: Gender Distribution ----------
@@ -501,35 +516,35 @@ def plot_combined_tree_diagram():
     for i, val_total in enumerate(total):
         # Female and Male %
         if female[i] + male[i] > 0:
-            ax.text(female_pct[i] / 2, i, f"{int(female_pct[i])}%", ha="center", va="center", fontsize=12, color="white")
-            ax.text(female_pct[i] + male_pct[i] / 2, i, f"{int(male_pct[i])}%", ha="center", va="center", fontsize=12, color="white")
+            ax.text(female_pct[i] / 2, i, f"{int(female_pct[i])}%", ha="center", va="center", fontsize=18, color="white")
+            ax.text(female_pct[i] + male_pct[i] / 2, i, f"{int(male_pct[i])}%", ha="center", va="center", fontsize=18, color="white")
         else:
-            ax.text(50, i, "N/A", ha="center", va="center", fontsize=12, color="black")
+            ax.text(50, i, "N/A", ha="center", va="center", fontsize=18, color="black")
 
         # **Place column headers for `n` and `m` centered above**
         ax.set_xlim(-120, 120)
         ax.set_ylim(-0.5, len(datasets)-0.5)
 
         if i == 0:
-            ax.text(105, len(datasets) + 0, r"$\it{m}$", ha="center", va="bottom", fontsize=16, color="black")
-            ax.text(115, len(datasets) + 0, r"$\it{n}$", ha="center", va="bottom", fontsize=16, color="black")
+            ax.text(105, len(datasets) + 0, r"$\it{m}$", ha="center", va="bottom", fontsize=18, color="black")
+            ax.text(115, len(datasets) + 0, r"$\it{n}$", ha="center", va="bottom", fontsize=18, color="black")
 
         # Total Subjects (m) in green
-        ax.text(105, i, str(int(val_total)), ha="center", va="center", fontsize=12, color=SUBJECTS_COLOR)
+        ax.text(105, i, str(int(val_total)), ha="center", va="center", fontsize=18, color=SUBJECTS_COLOR)
 
         # Total Articles (n) in purple
-        ax.text(115, i, str(papers[i]), ha="center", va="center", fontsize=12, color=PAPERS_COLOR)
+        ax.text(115, i, str(papers[i]), ha="center", va="center", fontsize=18, color=PAPERS_COLOR)
 
     # ---------- Y-axis ----------
     ax.set_yticks(range(len(datasets)))
-    ax.set_yticklabels(datasets, fontsize=12)
+    ax.set_yticklabels(datasets, fontsize=22)
 
     # ---------- X-axis ----------
     ax.set_xlabel("")  # Remove default label
     ax.axvline(0, color="black", linewidth=3)  # Vertical divider
 
     ax.set_xticks([-50, 0, 50])  # Only three ticks
-    ax.set_xticklabels(["Number of analyzed Articles ($\it{n}$)", "", "%"], fontsize=14, ha="center")
+    ax.set_xticklabels(["Number of analyzed Articles ($\it{n}$)", "", "%"], fontsize=22, ha="center")
 
     # ---------- Legend ----------
     ethnicity_handles = [
@@ -548,7 +563,7 @@ def plot_combined_tree_diagram():
         label_text = f"Fitzpatrick {FITZ_ROMAN[c]}"
         fitz_handles.append(mpatches.Patch(facecolor=c, edgecolor="black", label=label_text))
 
-    ax.legend(handles=fitz_handles + ethnicity_handles, loc="upper left", fontsize=12)
+    ax.legend(handles=fitz_handles + ethnicity_handles, loc="upper left", fontsize=18)
 
     plt.tight_layout()
     plt.show()
