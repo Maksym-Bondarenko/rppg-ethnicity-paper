@@ -61,6 +61,21 @@ PROPORTIONS = {
     "Others": [10, 20, 15, 30],
 }
 
+# MONK skin tone scale (10 shades from lightest to darkest)
+MONK_SCALE = {
+    1: "#f6ede4",
+    2: "#f3e7db",
+    3: "#f7ead0",
+    4: "#eadaba",
+    5: "#d7bd96",
+    6: "#a07e56",
+    7: "#825c43",
+    8: "#604134",
+    9: "#3a312a",
+    10: "#292420",
+}
+MONK_ROMAN = {idx: str(idx) for idx in MONK_SCALE}
+
 # Fitzpatrick scale color codes (I through VI).
 FITZPATRICK_SCALE = {
     1: "#FDECE0",  # Very fair
@@ -258,8 +273,7 @@ DATASET_INFO = {
 
 def get_fitz_indices(eth_string):
     """
-    Return a set of Fitzpatrick indices (1..6) for the given substring
-    rather than a list of color codes, so we can unify them easily.
+    Return a set of Fitzpatrick indices (1..6) based on common ethnicity keywords.
     """
     if not eth_string or eth_string.strip().lower() == "n/a":
         return set()
@@ -274,16 +288,45 @@ def get_fitz_indices(eth_string):
         idxs.update([2, 3, 4])
     if "latino" in lower_str or "native american" in lower_str:
         idxs.update([3, 4, 5])
-    if "black" in lower_str:
+    if "black" in lower_str or "african" in lower_str:
         idxs.update([5, 6])
     if "indian" in lower_str:
         idxs.update([4, 5])
-    if "varying skin tones" in lower_str:
-        idxs.update(range(1, 7))
-    if "fitzpatrick scale" in lower_str:
+    if "varying skin tones" in lower_str or "fitzpatrick" in lower_str:
         idxs.update(range(1, 7))
 
     return idxs
+
+def get_monk_indices(eth_string):
+    """
+    Return a set of Monk tone indices (1..10) based on ethnicity keywords.
+    """
+    if not eth_string or eth_string.strip().lower() == "n/a":
+        return set()
+
+    lower_str = eth_string.lower()
+    idxs = set()
+    if "white" in lower_str:
+        idxs.update([1, 2, 3])
+    if "caucasian" in lower_str:
+        idxs.update([1, 2, 3, 4])
+    if "asian" in lower_str:
+        idxs.update([3, 4, 5, 6])
+    if "latino" in lower_str or "native american" in lower_str:
+        idxs.update([4, 5, 6, 7])
+    if "black" in lower_str or "african" in lower_str:
+        idxs.update([7, 8, 9, 10])
+    if "indian" in lower_str:
+        idxs.update([5, 6, 7])
+    if "varying skin tones" in lower_str or "fitzpatrick" in lower_str:
+        idxs.update(range(1, 11))
+
+    return idxs
+
+def parse_ethnicity_string(eth_string):
+    if not eth_string or eth_string.strip().lower() == "n/a":
+        return ["n/a"]
+    return [e.strip().lower() for e in eth_string.split(",")]
 
 def parse_ethnicity_string(eth_string):
     """
@@ -387,9 +430,26 @@ def plot_ethnicity_boxplot_with_pvalues():
     df_ethnicity = prepare_ethnicity_dataframe()
     p_vals = calculate_p_values(df_ethnicity, "Ethnicity", "Proportion (%)")
 
-    plt.figure(figsize=(10, 6))
+    # Mapping of ethnicity group to Monk skin tone range
+    ethnicity_to_monk = {
+        "White": "1–3",
+        "Asian": "3–6",
+        "Black & Latino": "4–10",
+        "Others": "1–10"
+    }
+
+    # Update ethnicity labels with Monk scale
+    df_ethnicity["EthnicityLabel"] = df_ethnicity["Ethnicity"].apply(
+        lambda e: f"{e} (Monk {ethnicity_to_monk.get(e, 'N/A')})"
+    )
+
+    # Sort groups for consistent plotting and p-value annotation
+    unique_groups = list(df_ethnicity["Ethnicity"].unique())
+    group_labels = df_ethnicity["EthnicityLabel"].unique()
+
+    plt.figure(figsize=(12, 6))
     sns.boxplot(
-        x="Ethnicity",
+        x="EthnicityLabel",
         y="Proportion (%)",
         data=df_ethnicity,
         showmeans=True,
@@ -401,21 +461,30 @@ def plot_ethnicity_boxplot_with_pvalues():
         medianprops={"color": "black", "lw": 2},
     )
 
-    # Add p-values
+    # Add p-values in 10^x format
     y_max = df_ethnicity["Proportion (%)"].max() + 5
     step = 5
-    unique_groups = list(df_ethnicity["Ethnicity"].unique())
     for (g1, g2), pv in p_vals.items():
         x1 = unique_groups.index(g1)
         x2 = unique_groups.index(g2)
         y = y_max
         plt.plot([x1, x1, x2, x2], [y, y + 1, y + 1, y], lw=1.5, c="black")
-        plt.text((x1 + x2) * 0.5, y + 1.2, f"p={pv:.2e}", ha="center", va="bottom", fontsize=16)
+
+        # Format p-value to 10^x notation
+        if pv < 0.01:
+            exponent = int(np.floor(np.log10(pv)))
+            base = pv / 10**exponent
+            p_str = f"p = {base:.1f}×10^{exponent}"
+        else:
+            p_str = f"p = {pv:.2f}"
+
+        plt.text((x1 + x2) * 0.5, y + 1.2, p_str, ha="center", va="bottom", fontsize=16)
         y_max += step
 
-    # plt.title("Ethnicity Distribution in Public Datasets", fontsize=14, weight="bold")
     plt.ylabel("Proportion in Datasets (%)", fontsize=16)
-    plt.xlabel("Ethnicity", fontsize=16)
+    plt.xlabel("Ethnicity (Monk Scale)", fontsize=16)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
     plt.grid(axis="y", linestyle="--", alpha=0.7)
     plt.tight_layout()
     plt.show()
@@ -569,6 +638,113 @@ def plot_combined_tree_diagram():
     plt.show()
 
 
+def plot_tree_diagram_monk():
+    """
+    Tree-like plot using the Monk skin tone scale (instead of Fitzpatrick):
+      - Left side: usage in articles (scaled, colored by Monk skin tones)
+      - Right side: 100% stacked bar for female/male or N/A
+      - Right text columns: total # subjects (\it{m}) and articles (\it{n})
+    """
+    SUBJECTS_COLOR = "#006D2C"  # Green for total subjects (m)
+    PAPERS_COLOR = "#984EA3"    # Purple for total articles (n)
+    GRAY_COLOR = "#D3D3D3"       # Light gray for no ethnicity info
+
+    datasets = list(DATASET_INFO.keys())
+    papers = np.array([DATASET_INFO[ds]["Papers"] for ds in datasets])
+    female = np.array([0 if DATASET_INFO[ds]["Female"] == "N/A" else DATASET_INFO[ds]["Female"] for ds in datasets])
+    male = np.array([0 if DATASET_INFO[ds]["Male"] == "N/A" else DATASET_INFO[ds]["Male"] for ds in datasets])
+    total = np.array([DATASET_INFO[ds]["Total"] for ds in datasets])
+    total[total == 0] = 1
+
+    female_pct = (female / total) * 100.0
+    male_pct = (male / total) * 100.0
+    max_usage = papers.max()
+
+    fig, ax = plt.subplots(figsize=(20, 12))
+
+    # ---------- LEFT side: Monk scale bars ----------
+    for i, ds in enumerate(datasets):
+        eth_string = DATA_ETHNICITY_MAPPING.get(ds, "N/A")
+        sub_ethnicities = parse_ethnicity_string(eth_string)
+
+        monk_index_set = set()
+        for eth in sub_ethnicities:
+            if eth != "n/a":
+                monk_index_set |= get_monk_indices(eth)
+
+        usage_scaled = papers[i] * 100.0 / max_usage
+
+        if not monk_index_set:
+            ax.barh(i, -usage_scaled, left=0, color=GRAY_COLOR, edgecolor="black", label="No Ethnicity Info" if i == 0 else None)
+        else:
+            combined_colors = [MONK_SCALE[idx] for idx in sorted(monk_index_set)]
+            ethnicity_labels = [MONK_ROMAN[idx] for idx in sorted(monk_index_set)]
+
+            n_subs = len(combined_colors)
+            for j, (color_code, label) in enumerate(zip(combined_colors, ethnicity_labels)):
+                frac_start = j / n_subs
+                frac_end = (j + 1) / n_subs
+                seg_start = usage_scaled * frac_start
+                seg_end = usage_scaled * frac_end
+                bar_width = -(seg_end - seg_start)
+                left_edge = -seg_start
+                ax.barh(i, bar_width, left=left_edge, color=color_code, edgecolor="black")
+
+                if abs(bar_width) > 4 and label:
+                    ax.text(left_edge + bar_width / 2, i, label, ha="center", va="center", fontsize=18, color="black")
+
+    # ---------- RIGHT side: Gender bars ----------
+    for i in range(len(datasets)):
+        if female[i] == 0 and male[i] == 0:
+            ax.barh(i, 100, color="white", edgecolor="black")
+        else:
+            ax.barh(i, female_pct[i], color="#DF65B0", edgecolor="black")
+            ax.barh(i, male_pct[i], left=female_pct[i], color="#2C7FB8", edgecolor="black")
+
+    # ---------- Right-side labels ----------
+    for i, val_total in enumerate(total):
+        if female[i] + male[i] > 0:
+            ax.text(female_pct[i] / 2, i, f"{int(female_pct[i])}%", ha="center", va="center", fontsize=18, color="white")
+            ax.text(female_pct[i] + male_pct[i] / 2, i, f"{int(male_pct[i])}%", ha="center", va="center", fontsize=18, color="white")
+        else:
+            ax.text(50, i, "N/A", ha="center", va="center", fontsize=18, color="black")
+
+        if i == 0:
+            ax.set_xlim(-120, 120)
+            ax.set_ylim(-0.5, len(datasets) - 0.5)
+            ax.text(105, len(datasets), r"$\it{m}$", ha="center", va="bottom", fontsize=18, color="black")
+            ax.text(115, len(datasets), r"$\it{n}$", ha="center", va="bottom", fontsize=18, color="black")
+
+        ax.text(105, i, str(int(val_total)), ha="center", va="center", fontsize=18, color=SUBJECTS_COLOR)
+        ax.text(115, i, str(papers[i]), ha="center", va="center", fontsize=18, color=PAPERS_COLOR)
+
+    # ---------- Axes ----------
+    ax.set_yticks(range(len(datasets)))
+    ax.set_yticklabels(datasets, fontsize=22)
+    ax.set_xlabel("")
+    ax.axvline(0, color="black", linewidth=3)
+    ax.set_xticks([-50, 0, 50])
+    ax.set_xticklabels(["Number of analyzed Articles ($\it{n}$)", "", "%"], fontsize=22, ha="center")
+
+    # ---------- Legend ----------
+    monk_handles = [
+        mpatches.Patch(facecolor=MONK_SCALE[idx], edgecolor="black", label=f"Monk {MONK_ROMAN[idx]}")
+        for idx in sorted(MONK_SCALE)
+    ]
+    extra_handles = [
+        mpatches.Patch(facecolor=GRAY_COLOR, edgecolor="black", label="No Ethnicity Info"),
+        mpatches.Patch(facecolor="#DF65B0", edgecolor="black", label="Female"),
+        mpatches.Patch(facecolor="#2C7FB8", edgecolor="black", label="Male"),
+        mpatches.Patch(facecolor="white", edgecolor="black", label="No Gender Info"),
+        mpatches.Patch(facecolor=SUBJECTS_COLOR, edgecolor="black", label=r"$\it{m}$ subjects in analyzed datasets"),
+        mpatches.Patch(facecolor=PAPERS_COLOR, edgecolor="black", label=r"$\it{n}$ datasets usages in analyzed articles")
+    ]
+    ax.legend(handles=monk_handles + extra_handles, loc="upper left", fontsize=18)
+
+    plt.tight_layout()
+    plt.show()
+
+
 ####################################################################################################
 # MAIN
 ####################################################################################################
@@ -576,3 +752,4 @@ def plot_combined_tree_diagram():
 if __name__ == "__main__":
     plot_ethnicity_boxplot_with_pvalues()
     plot_combined_tree_diagram()
+    plot_tree_diagram_monk()
