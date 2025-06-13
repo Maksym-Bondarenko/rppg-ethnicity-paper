@@ -744,6 +744,91 @@ def plot_tree_diagram_monk():
     plt.tight_layout()
     plt.show()
 
+####################################################################################################
+# Supplementary Information Plots
+####################################################################################################
+
+dataset_counts = {
+        "UBFC-rPPG": 52, "PURE": 34, "VIPL-HR": 27, "COHFACE": 22,
+        "MMSE-HR": 14, "MAHNOB-HCI": 10, "UBFC-Phys": 6, "MR-Nirp": 5,
+        "OBF": 4, "BH-rPPG": 4, "BUAA": 3, "MPSC-rPPG": 3,
+        "ECG Fitness": 2, "V4V": 2, "TokyoTech": 2, "MERL": 2,
+        "PFF": 1, "LGI-PPGI": 1, "DDPM": 1, "UCLA-rPPG": 1,
+        "DEAP": 1, "VicarPPG": 1, "BP4D+": 1, "CCUHR": 1
+    }
+
+def plot_dataset_distribution(dataset_counts: dict) -> None:
+    """
+    Display a donut chart of dataset usage.
+
+    • Shows percentage labels only (no counts), and only for slices ≥ 5 %.
+    • Uses discrete colours from tab20 / tab20b / tab20c to avoid duplicates.
+    • Does NOT save the figure to disk.
+
+    Parameters
+    ----------
+    dataset_counts : dict
+        Mapping of dataset name → paper count (int).
+    """
+
+    # ---- 1. Sort data (descending frequency) ----
+    datasets, counts = zip(*sorted(dataset_counts.items(),
+                                   key=lambda kv: kv[1],
+                                   reverse=True))
+    total = sum(counts)
+
+    # ---- 2. Build a unique colour list ----
+    def _build_colour_list(n):
+        palette = list(mpl.cm.get_cmap('tab20').colors)
+        if n > len(palette):
+            palette += list(mpl.cm.get_cmap('tab20b').colors)
+        if n > len(palette):
+            palette += list(mpl.cm.get_cmap('tab20c').colors)
+        if n > len(palette):                         # unlikely here (max 60 colours)
+            extra = mpl.cm.hsv(np.linspace(0, 1, n - len(palette)))
+            palette += list(extra)
+        return palette[:n]
+
+    colors = _build_colour_list(len(datasets))
+
+    # ---- 3. Label helper: % only, shown if ≥ 5 % ----
+    def _autopct(pct):
+        return f"{pct:.1f}%" if pct >= 5 else ""
+
+    # ---- 4. Plot ----
+    fig, ax = plt.subplots(figsize=(8, 8))
+    wedges, _, autotexts = ax.pie(
+        counts,
+        startangle=90,
+        counterclock=False,
+        colors=colors,
+        wedgeprops=dict(width=0.35),
+        autopct=_autopct,
+        pctdistance=0.78
+    )
+
+    # Format inside-slice % labels
+    for t in autotexts:
+        t.set_fontsize(9)
+        t.set_color("white")
+        t.set_weight("bold")
+
+    # Donut hole
+    ax.add_artist(plt.Circle((0, 0), 0.68, fc="white"))
+    ax.axis("equal")
+
+    # Legend shows dataset + count
+    legend_labels = [f"{d} ({c})" for d, c in zip(datasets, counts)]
+    ax.legend(
+        wedges, legend_labels,
+        title="Datasets",
+        loc="center left",
+        bbox_to_anchor=(1, 0, 0.35, 1),
+        fontsize="small"
+    )
+
+    plt.tight_layout()
+    plt.show()
 
 ####################################################################################################
 # MAIN
@@ -753,3 +838,4 @@ if __name__ == "__main__":
     plot_ethnicity_boxplot_with_pvalues()
     plot_combined_tree_diagram()
     plot_tree_diagram_monk()
+    plot_dataset_distribution(dataset_counts)
